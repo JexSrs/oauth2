@@ -190,6 +190,28 @@ export class Server {
         res.status(200).json(response);
     }
 
+    private async clientCredentials(req: any, res: any): Promise<void> {
+        if (req.method !== 'POST')
+            return res.status(405).end('Method not allowed.');
+
+        let {client_id, client_secret} = getCredentials(req);
+        let {scope} = req.body;
+
+        // Check scopes
+        let scopes: string[] | null;
+        if ((scopes = await parseScopes(scope, this.options)) == null)
+            return res.status(422).end('One or more scopes are not acceptable');
+
+        // Do database request at last to lessen db costs.
+        if (!(await this.options.validateClient(client_id, client_secret, null)))
+            return res.status(403).end('Client authentication failed.');
+
+        let response = await generateARTokens(client_id, scopes, req, this.options);
+        delete response.refresh_token;
+        delete response.refresh_token_expires_in;
+        res.status(200).json(response);
+    }
+
     public authorize(): ExpressMiddleware {
         return (req, res, next) => {
             let grantType = req.params.response_type || req.body.response_type;
@@ -207,6 +229,7 @@ export class Server {
                     this.resourceOwnerCredentials(req, res);
                     break;
                 case 'client_credentials': // Client Credentials
+                    this.clientCredentials(req, res);
                     break;
                 case 'refresh_token': // Refresh Token
                     break;
