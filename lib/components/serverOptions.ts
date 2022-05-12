@@ -1,44 +1,44 @@
 type DBTokenSave = {
     accessToken: string;
-    accessTokenExpiresAt: string;
+    accessTokenExpiresAt: number;
     payload: object;
     refreshToken?: string;
-    refreshTokenExpiresAt?: string;
+    refreshTokenExpiresAt?: number;
 };
 
 type DBAccessTokenLoad = {
     accessToken: string;
-    accessTokenExpiresAt: string;
+    accessTokenExpiresAt: number;
     payload: object;
 };
 
 type DBRefreshTokenLoad = {
     refreshToken: string;
-    refreshTokenExpiresAt: string;
+    refreshTokenExpiresAt: number;
 };
 
 type DBTokenRemove = {
     accessToken: string;
-    accessTokenExpiresAt: string;
+    accessTokenExpiresAt: number;
     payload: object;
 };
 
 type DBAuthorizationCodeSave = {
     authorizationCode: string;
-    expiresAt: string;
-    payload: string;
+    expiresAt: number;
+    payload: object;
 };
 
 type DBAuthorizationCodeLoad = {
     authorizationCode: string;
-    expiresAt: string;
-    payload: string;
+    expiresAt: number;
+    payload: object;
 };
 
 type DBAuthorizationCodeRemove = {
     authorizationCode: string;
-    expiresAt: string;
-    payload: string;
+    expiresAt: number;
+    payload: object;
 };
 
 export type DatabaseFunctions = {
@@ -152,14 +152,42 @@ export type ServerOptions = {
      */
     payloadLocation: (req: any, payload: object) => void;
     /**
-     * Set the data that will be saved at the payload.
-     * Defaults to userid (from basic auth) stored at req.headers['authorization'].
+     * Set the data that will be included at the payload.
+     * The payload will already contain the client_id that was provided during the authorization.
+     * Defaults to {}.
      * @param req The request instance.
      */
-    setPayload: (req: any) => object;
+    includeToPayload: (req: any) => object;
     /**
      * Override the database's functions needed for storing and accessing the tokens.
      * Defaults to memory.
      */
     database: DatabaseFunctions;
+    /**
+     * Set an array of valid scopes, if the client sends one or more scopes that are not
+     * listed here, it will respond with the appropriate error message.
+     * Defaults to ['read', 'write'].
+     */
+    acceptedScopes: string[] | ((scope: string) => Promise<boolean>);
+    /**
+     * The delimiter that will be used to split the scope string.
+     * Defaults tp ' ' (one space character).
+     */
+    scopeDelimiter: string;
+    /**
+     * Specify the minimum state length that the client will send during authorization.
+     * Defaults to 8 characters.
+     */
+    minStateLength: number;
+    /**
+     * Validates that the client in question is registered.
+     * Defaults to true.
+     * CAUTION! It is highly recommended to pass your own validation function, so you will not allow
+     * just anyone to generate tokens for themselves.
+     * @param client_id The client's id.
+     * @param client_secret The client's secret. If null then there is no need to authenticate client.
+     * @param redirect_uri The redirect_uri passed by the client. This will be included in the registered check.
+     * @return boolean True if validation succeeds, false otherwise.
+     */
+    validateClient: (client_id: string, client_secret: string | null, redirect_uri: string) => Promise<boolean>;
 };
