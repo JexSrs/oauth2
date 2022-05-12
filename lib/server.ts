@@ -1,22 +1,21 @@
-import {nanoid} from "nanoid";
 import {ServerOptions} from "./components/serverOptions";
 import {ExpressMiddleware} from "./components/types";
-import {generateARTokens, signToken, someAsync, verifyToken} from "./modules/utils";
+import {generateARTokens, getCredentials, parseScopes, signToken, verifyToken} from "./modules/utils";
 import {memory} from "./modules/memory";
 
 export class Server {
 
     private readonly options: ServerOptions;
 
-    constructor(options?: Partial<ServerOptions>) {
+    constructor(options?: ServerOptions) {
         let opts: Partial<ServerOptions> = options || {};
+
+        if (!opts.allowedGrantTypes)
+            opts.allowedGrantTypes = ['authorization-code', 'resource-owner-credentials', 'refresh-token'];
 
         if (!opts.getToken)
             opts.getToken = (req) => req.headers['authorization'];
-        if (!opts.secret) {
-            console.log('CAUTION! You are not using a personal secret, on app restart it will be overwritten.');
-            opts.secret = nanoid(64);
-        }
+
         if (!opts.tokenUtils)
             opts.tokenUtils = {
                 sign: (payload, expiresIn) => signToken(payload, opts.secret, expiresIn),
@@ -50,7 +49,9 @@ export class Server {
             opts.payloadLocation = (req, payload) => req.oauth2 = payload;
 
         if (!opts.includeToPayload)
-            opts.includeToPayload = req => {return {}};
+            opts.includeToPayload = req => {
+                return {};
+            };
 
         if (!opts.database)
             opts.database = memory();
@@ -63,11 +64,6 @@ export class Server {
 
         if (!opts.minStateLength)
             opts.minStateLength = 8;
-
-        if (!opts.validateClient) {
-            console.log('CAUTION! You are not using a personal validateClient function, this will make the OAuth2 authorization available to everyone.');
-            opts.validateClient = async (client_id, client_secret, redirect_uri) => true;
-        }
 
         this.options = opts as ServerOptions;
     }
@@ -83,22 +79,21 @@ export class Server {
             return res.status(422).end(`state must be at least ${this.options.minStateLength} characters`);
 
         // Check scopes
-        let scopes: string[] = scope.split(this.options.scopeDelimiter);
-        if ((Array.isArray(this.options.acceptedScopes)
-                && scopes.some(s => !(this.options.acceptedScopes as string[]).includes(s)))
-            || await someAsync(scopes, async s => !(await (this.options.acceptedScopes as any)(s)))
-        ) return res.status(422).end('One or more scopes are not acceptable');
+        let scopes: string[] | null;
+        if ((scopes = await parseScopes(scope, this.options)) == null)
+            return res.status(422).end('One or more scopes are not acceptable');
 
         // Validate redirect_uri & client_id
         if (!(await this.options.validateClient(client_id, null, redirect_uri)))
             return res.status(401).end('redirect_uri is not registered');
 
         // Checks are done, generate authorization code
-        let payload = {client_id};
+        let payload = {client_id, scopes};
         let code = this.options.tokenUtils.sign(payload, this.options.authorizationCodeLifetime);
         await this.options.database.saveAuthorizationCode({
             authorizationCode: code,
-            payload,
+            clientId: client_id,
+            scopes,
             expiresAt: Math.trunc((Date.now() + this.options.authorizationCodeLifetime * 1000) / 1000),
         });
 
@@ -109,48 +104,42 @@ export class Server {
         if (req.method !== 'POST')
             return res.status(405).end('Method not allowed.');
 
-        let authHeader = req.headers['authorization'];
-        let decoded = authHeader && Buffer.from(authHeader, 'base64').toString()
-        if(!decoded) return res.status(403).end('Authorization header is missing');
-
-        let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
-        if(!client_id || !client_secret) return res.status(403).end('Authorization header is missing');
-
+        let {client_id, client_secret} = getCredentials(req);
         let {code, redirect_uri} = req.params;
-
-        // Validate redirect_uri
-        if (!redirect_uri) return res.status(401).end('redirect_uri is not registered');
-
-        if(!(await this.options.validateClient(client_id, client_secret, redirect_uri)))
-            return res.status(403).end('Client authentication failed.');
 
         // Token verification
         let authCodePayload: any = this.options.tokenUtils.verify(code);
-        if(!authCodePayload) return res.status(401).end('Authorization code is not valid.');
+        if (!authCodePayload) return res.status(401).end('Authorization code is not valid.');
 
         // Payload verification
-        if(authCodePayload.client_id !== client_id)
+        if (authCodePayload.client_id !== client_id)
             return res.status(401).end('Authorization code does not belong to authenticated client.');
+
+        // Do database request at last to lessen db costs.
+        if (!(await this.options.validateClient(client_id, client_secret, redirect_uri || '')))
+            return res.status(403).end('Client authentication failed.');
 
         // Database verification
         let dbCode = await this.options.database.loadAuthorizationCode({
-            payload: {client_id},
+            clientId: client_id,
+            scopes: authCodePayload.scopes,
             authorizationCode: code,
             expiresAt: authCodePayload.exp
         });
 
-        if(!dbCode || dbCode !== code)
+        if (!dbCode || dbCode !== code)
             return res.status(401).end('Authorization code is not valid.');
 
         // Database delete
         await this.options.database.removeAuthorizationCode({
-            payload: {client_id},
+            clientId: client_id,
+            scopes: authCodePayload.scopes,
             authorizationCode: code,
             expiresAt: authCodePayload.exp
         });
 
         // Generate access & refresh tokens
-        let response = await generateARTokens(client_id, req, this.options);
+        let response = await generateARTokens(client_id, authCodePayload.scopes, req, this.options);
         res.status(200).json(response);
     }
 
@@ -165,18 +154,39 @@ export class Server {
             return res.status(422).end(`state must be at least ${this.options.minStateLength} characters`);
 
         // Check scopes
-        let scopes: string[] = scope.split(this.options.scopeDelimiter);
-        if ((Array.isArray(this.options.acceptedScopes)
-                && scopes.some(s => !(this.options.acceptedScopes as string[]).includes(s)))
-            || await someAsync(scopes, async s => !(await (this.options.acceptedScopes as any)(s)))
-        ) return res.status(422).end('One or more scopes are not acceptable');
+        let scopes: string[] | null;
+        if ((scopes = await parseScopes(scope, this.options)) == null)
+            return res.status(422).end('One or more scopes are not acceptable');
 
         // Validate redirect_uri & client_id
         if (!(await this.options.validateClient(client_id, null, redirect_uri)))
             return res.status(401).end('redirect_uri is not registered');
 
         // Generate access & refresh tokens
-        let response = await generateARTokens(client_id, req, this.options);
+        let response = await generateARTokens(client_id, scopes, req, this.options);
+        res.status(200).json(response);
+    }
+
+    private async resourceOwnerCredentials(req: any, res: any): Promise<void> {
+        if (req.method !== 'POST')
+            return res.status(405).end('Method not allowed.');
+
+        let {client_id, client_secret} = getCredentials(req);
+        let {username, password, scope} = req.body;
+
+        // Check scopes
+        let scopes: string[] | null;
+        if ((scopes = await parseScopes(scope, this.options)) == null)
+            return res.status(422).end('One or more scopes are not acceptable');
+
+        // Do database request at last to lessen db costs.
+        if (!(await this.options.validateClient(client_id, client_secret, null)))
+            return res.status(403).end('Client authentication failed.');
+
+        if (!(await this.options.validateUser(username, password)))
+            return res.status(403).end('Client authentication failed.');
+
+        let response = await generateARTokens(client_id, scopes, req, this.options);
         res.status(200).json(response);
     }
 
@@ -194,6 +204,7 @@ export class Server {
                     this.implicit(req, res);
                     break;
                 case 'password': // Resource Owner Credentials
+                    this.resourceOwnerCredentials(req, res);
                     break;
                 case 'client_credentials': // Client Credentials
                     break;

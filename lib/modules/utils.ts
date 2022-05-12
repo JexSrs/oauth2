@@ -1,6 +1,6 @@
 import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
-import {ARTokensResponse} from "../components/types";
+import {ARTokensResponse, ClientCredentials} from "../components/types";
 
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
@@ -21,14 +21,16 @@ export async function someAsync(arr: any[], check: (element: any) => Promise<boo
     return false;
 }
 
-export async function generateARTokens(client_id: string, req: any, options: ServerOptions): Promise<ARTokensResponse> {
+export async function generateARTokens(client_id: string, scopes: string[], req: any, options: ServerOptions): Promise<ARTokensResponse> {
     let accessTokenPayload = {
         ...options.includeToPayload(req),
         client_id,
+        scopes,
         type: 'accessToken'
     };
     let refreshTokenPayload = {
         client_id,
+        scopes,
         type: 'refreshToken'
     };
 
@@ -53,4 +55,26 @@ export async function generateARTokens(client_id: string, req: any, options: Ser
         refresh_token: refreshToken,
         refresh_token_expires_in: refreshToken ? options.refreshTokenLifetime : undefined,
     };
+}
+
+export function getCredentials(req: any): ClientCredentials {
+    let authHeader = req.headers['authorization'];
+    let decoded = authHeader
+        && Buffer.from(authHeader, 'base64').toString()
+        || '';
+
+    let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
+    return {
+        client_id: client_id || '',
+        client_secret: client_secret || ''
+    };
+}
+
+export async function parseScopes(scope: string, options: ServerOptions): Promise<string[] | null> {
+    let scopes: string[] = scope.split(options.scopeDelimiter);
+    if ((Array.isArray(options.acceptedScopes)
+            && scopes.some(s => !(options.acceptedScopes as string[]).includes(s)))
+        || await someAsync(scopes, async s => !(await (options.acceptedScopes as any)(s)))
+    ) return null;
+    return scopes;
 }

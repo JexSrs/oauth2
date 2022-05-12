@@ -7,3 +7,8 @@ export type ARTokensResponse = {
     refresh_token?: string;
     refresh_token_expires_in?: number;
 };
+
+export type ClientCredentials = {
+    client_id: string;
+    client_secret: string;
+}

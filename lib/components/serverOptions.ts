@@ -26,19 +26,22 @@ type DBTokenRemove = {
 type DBAuthorizationCodeSave = {
     authorizationCode: string;
     expiresAt: number;
-    payload: object;
+    clientId: string;
+    scopes: string[];
 };
 
 type DBAuthorizationCodeLoad = {
     authorizationCode: string;
     expiresAt: number;
-    payload: object;
+    clientId: string;
+    scopes: string[];
 };
 
 type DBAuthorizationCodeRemove = {
     authorizationCode: string;
     expiresAt: number;
-    payload: object;
+    clientId: string;
+    scopes: string[];
 };
 
 export type DatabaseFunctions = {
@@ -88,17 +91,20 @@ export type DatabaseFunctions = {
 
 export type ServerOptions = {
     /**
+     * Enabled grant types.
+     * Defaults to ['authorization-code', 'resource-owner-credentials', 'refresh-token'].
+     */
+    allowedGrantTypes?: ('authorization-code' | 'implicit' | 'resource-owner-credentials' | 'client-credentials' | 'refresh-token')[];
+    /**
      * Override token location.
      * Defaults to req.headers['authorization'].
      * @param req The request instance.
      * @return string The token that the client passed.
      */
-    getToken: (req: any) => string;
+    getToken?: (req: any) => string;
     /**
      * The token secret that will be used to sign the tokens.
      * This will be used only if default implementation is used for token sign/verification.
-     * Defaults to random 64 characters.
-     * CAUTION! It is recommended to pass your own secret to avoid verification in case your app restarts.
      */
     secret: string;
     /**
@@ -106,7 +112,7 @@ export type ServerOptions = {
      * It will be used to create and validate tokens such as: access token, refresh token, authorization code.
      * Defaults to JSONWebToken implementation.
      */
-    tokenUtils: {
+    tokenUtils?: {
         /**
          * Override token generation.
          * @param payload The payload that needs to be saved inside the token.
@@ -126,23 +132,23 @@ export type ServerOptions = {
      * If set to null, then the token will never expire.
      * Defaults to 86400 seconds (1 day).
      */
-    accessTokenLifetime: number | null;
+    accessTokenLifetime?: number | null;
     /**
      * Whether a refresh token will be generated alongside the access token.
      * Defaults to true.
      */
-    allowRefreshToken: boolean;
+    allowRefreshToken?: boolean;
     /**
      * The refresh token's lifetime in seconds.
      * If set to null, then the token will never expire.
      * Defaults to 864000 seconds (10 days).
      */
-    refreshTokenLifetime: number | null;
+    refreshTokenLifetime?: number | null;
     /**
      * The authorization code's lifetime in seconds.
      * Defaults to 300 seconds (5 minutes).
      */
-    authorizationCodeLifetime: number;
+    authorizationCodeLifetime?: number;
     /**
      * Override payload location (when the verification is complete where to save the verified payload,
      * so it can be accessed later by the app).
@@ -150,44 +156,48 @@ export type ServerOptions = {
      * @param req The request instance.
      * @param payload The payload that will be saved at the request instance.
      */
-    payloadLocation: (req: any, payload: object) => void;
+    payloadLocation?: (req: any, payload: object) => void;
     /**
      * Set the data that will be included at the payload.
      * The payload will already contain the client_id that was provided during the authorization.
      * Defaults to {}.
      * @param req The request instance.
      */
-    includeToPayload: (req: any) => object;
+    includeToPayload?: (req: any) => object;
     /**
      * Override the database's functions needed for storing and accessing the tokens.
      * Defaults to memory.
      */
-    database: DatabaseFunctions;
+    database?: DatabaseFunctions;
     /**
      * Set an array of valid scopes, if the client sends one or more scopes that are not
      * listed here, it will respond with the appropriate error message.
      * Defaults to ['read', 'write'].
      */
-    acceptedScopes: string[] | ((scope: string) => Promise<boolean>);
+    acceptedScopes?: string[] | ((scope: string) => Promise<boolean>);
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults tp ' ' (one space character).
      */
-    scopeDelimiter: string;
+    scopeDelimiter?: string;
     /**
      * Specify the minimum state length that the client will send during authorization.
      * Defaults to 8 characters.
      */
-    minStateLength: number;
+    minStateLength?: number;
     /**
      * Validates that the client in question is registered.
-     * Defaults to true.
-     * CAUTION! It is highly recommended to pass your own validation function, so you will not allow
-     * just anyone to generate tokens for themselves.
      * @param client_id The client's id.
      * @param client_secret The client's secret. If null then there is no need to authenticate client.
      * @param redirect_uri The redirect_uri passed by the client. This will be included in the registered check.
+     *                      If null then there is no need to check for redirect_uri.
      * @return boolean True if validation succeeds, false otherwise.
+     */ // TODO - Maybe split it?
+    validateClient: (client_id: string, client_secret: string | null, redirect_uri: string | null) => Promise<boolean>;
+    /**
+     * Checks if user's credentials are valid.
+     * @param username
+     * @param password
      */
-    validateClient: (client_id: string, client_secret: string | null, redirect_uri: string) => Promise<boolean>;
+    validateUser: (username: string, password: string) => Promise<boolean>;
 };
