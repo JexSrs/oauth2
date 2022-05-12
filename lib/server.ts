@@ -1,7 +1,7 @@
 import {nanoid} from "nanoid";
 import {ServerOptions} from "./components/serverOptions";
 import {ExpressMiddleware} from "./components/types";
-import {signToken, someAsync, verifyToken} from "./modules/utils";
+import {generateARTokens, signToken, someAsync, verifyToken} from "./modules/utils";
 import {memory} from "./modules/memory";
 
 export class Server {
@@ -13,8 +13,10 @@ export class Server {
 
         if (!opts.getToken)
             opts.getToken = (req) => req.headers['authorization'];
-        if (!opts.secret)
+        if (!opts.secret) {
+            console.log('CAUTION! You are not using a personal secret, on app restart it will be overwritten.');
             opts.secret = nanoid(64);
+        }
         if (!opts.tokenUtils)
             opts.tokenUtils = {
                 sign: (payload, expiresIn) => signToken(payload, opts.secret, expiresIn),
@@ -62,8 +64,10 @@ export class Server {
         if (!opts.minStateLength)
             opts.minStateLength = 8;
 
-        if (!opts.validateClient)
+        if (!opts.validateClient) {
+            console.log('CAUTION! You are not using a personal validateClient function, this will make the OAuth2 authorization available to everyone.');
             opts.validateClient = async (client_id, client_secret, redirect_uri) => true;
+        }
 
         this.options = opts as ServerOptions;
     }
@@ -135,7 +139,7 @@ export class Server {
             expiresAt: authCodePayload.exp
         });
 
-        if(dbCode !== code)
+        if(!dbCode || dbCode !== code)
             return res.status(401).end('Authorization code is not valid.');
 
         // Database delete
@@ -146,42 +150,33 @@ export class Server {
         });
 
         // Generate access & refresh tokens
-        let accessTokenPayload = {
-            ...this.options.includeToPayload(req),
-            client_id,
-            type: 'accessToken'
-        };
-        let refreshTokenPayload = {
-            client_id,
-            type: 'refreshToken'
-        };
+        let response = await generateARTokens(client_id, req, this.options);
+        res.status(200).json(response);
+    }
 
-        let accessToken: string = this.options.tokenUtils.sign(accessTokenPayload, this.options.accessTokenLifetime);
-        let refreshToken: string | undefined;
-        if(this.options.allowRefreshToken)
-            refreshToken = this.options.tokenUtils.sign(refreshTokenPayload, this.options.refreshTokenLifetime);
+    private async implicit(req: any, res: any): Promise<void> {
+        if (req.method !== 'GET')
+            return res.status(405).end('Method not allowed.');
 
-        // Database save
-        await this.options.database.saveToken({
-            accessToken,
-            payload: accessTokenPayload,
-            accessTokenExpiresAt: Math.trunc((Date.now() + this.options.accessTokenLifetime * 1000) / 1000),
-            refreshToken,
-            refreshTokenExpiresAt: Math.trunc((Date.now() + this.options.refreshTokenLifetime * 1000) / 1000),
-        });
+        let {client_id, state, redirect_uri, scope} = req.params;
 
-        // Respond
-        let response: any = {
-            access_token: accessToken,
-            token_type: 'bearer',
-            expires_in: this.options.accessTokenLifetime,
-        };
+        // Check if state exists and is at least 8 chars
+        if (state.length < this.options.minStateLength)
+            return res.status(422).end(`state must be at least ${this.options.minStateLength} characters`);
 
-        if(refreshToken) {
-            response.refresh_token = refreshToken;
-            response.refresh_token_expires_in = this.options.refreshTokenLifetime;
-        }
+        // Check scopes
+        let scopes: string[] = scope.split(this.options.scopeDelimiter);
+        if ((Array.isArray(this.options.acceptedScopes)
+                && scopes.some(s => !(this.options.acceptedScopes as string[]).includes(s)))
+            || await someAsync(scopes, async s => !(await (this.options.acceptedScopes as any)(s)))
+        ) return res.status(422).end('One or more scopes are not acceptable');
 
+        // Validate redirect_uri & client_id
+        if (!(await this.options.validateClient(client_id, null, redirect_uri)))
+            return res.status(401).end('redirect_uri is not registered');
+
+        // Generate access & refresh tokens
+        let response = await generateARTokens(client_id, req, this.options);
         res.status(200).json(response);
     }
 
@@ -196,6 +191,7 @@ export class Server {
                     this.authorizationCode2(req, res);
                     break;
                 case 'token': // Implicit Grant
+                    this.implicit(req, res);
                     break;
                 case 'password': // Resource Owner Credentials
                     break;

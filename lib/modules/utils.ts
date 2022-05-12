@@ -1,4 +1,6 @@
 import * as jwt from "jsonwebtoken";
+import {ServerOptions} from "../components/serverOptions";
+import {ARTokensResponse} from "../components/types";
 
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
@@ -17,4 +19,38 @@ export async function someAsync(arr: any[], check: (element: any) => Promise<boo
             return true;
     }
     return false;
+}
+
+export async function generateARTokens(client_id: string, req: any, options: ServerOptions): Promise<ARTokensResponse> {
+    let accessTokenPayload = {
+        ...options.includeToPayload(req),
+        client_id,
+        type: 'accessToken'
+    };
+    let refreshTokenPayload = {
+        client_id,
+        type: 'refreshToken'
+    };
+
+    let accessToken: string = options.tokenUtils.sign(accessTokenPayload, options.accessTokenLifetime);
+    let refreshToken: string | undefined;
+    if(this.options.allowRefreshToken)
+        refreshToken = options.tokenUtils.sign(refreshTokenPayload, options.refreshTokenLifetime);
+
+    // Database save
+    await options.database.saveToken({
+        accessToken,
+        payload: accessTokenPayload,
+        accessTokenExpiresAt: Math.trunc((Date.now() + options.accessTokenLifetime * 1000) / 1000),
+        refreshToken,
+        refreshTokenExpiresAt: Math.trunc((Date.now() + options.refreshTokenLifetime * 1000) / 1000),
+    });
+
+    return {
+        access_token: accessToken,
+        token_type: 'bearer',
+        expires_in: options.accessTokenLifetime,
+        refresh_token: refreshToken,
+        refresh_token_expires_in: refreshToken ? options.refreshTokenLifetime : undefined,
+    };
 }
