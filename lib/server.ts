@@ -1,6 +1,14 @@
 import {ServerOptions} from "./components/serverOptions";
 import {ExpressMiddleware} from "./components/types";
-import {allowedMethod, generateARTokens, getCredentials, parseScopes, signToken, verifyToken} from "./modules/utils";
+import {
+    allowedMethod,
+    generateARTokens,
+    getCredentials,
+    objToParams,
+    parseScopes,
+    signToken,
+    verifyToken
+} from "./modules/utils";
 import {memory} from "./modules/memory";
 
 
@@ -70,7 +78,7 @@ export class Server {
         if ((scopes = await parseScopes(scope, this.options)) == null)
             return res.status(401).end('One or more scopes are not acceptable');
 
-        if(!client_id || !redirect_uri)
+        if (!client_id || !redirect_uri)
             return res.status(401).end('Missing parameters.');
 
         // Validate redirect_uri & client_id
@@ -119,7 +127,7 @@ export class Server {
         if (!dbCode || dbCode.authorizationCode !== code)
             return res.status(401).end('Authorization code is not valid.');
 
-        if(redirect_uri !== dbCode.redirect_uri)
+        if (redirect_uri !== dbCode.redirect_uri)
             return res.status(401).end('redirect_uri is not valid.');
 
         // Database delete
@@ -130,7 +138,10 @@ export class Server {
         });
 
         // Generate access & refresh tokens
-        let response = await generateARTokens({client_id, user: dbCode.user}, authCodePayload.scopes, req, this.options);
+        let response = await generateARTokens({
+            client_id,
+            user: dbCode.user
+        }, authCodePayload.scopes, req, this.options);
         res.status(200).json(response);
     }
 
@@ -147,12 +158,14 @@ export class Server {
             return res.status(422).end('One or more scopes are not acceptable');
 
         // Validate redirect_uri & client_id
-        if (!(await this.options.validateClient(client_id, null, redirect_uri)))
+        if (!(await this.options.validateRedirectUri(client_id, redirect_uri)))
             return res.status(401).end('redirect_uri is not registered');
 
         // Generate access & refresh tokens
-        let response = await generateARTokens(client_id, scopes, req, this.options);
-        res.status(200).json(response);
+        let user = this.options.getUser(req);
+        let payload = {client_id, user};
+        let response = await generateARTokens(payload, scopes, req, this.options);
+        res.redirect(`${redirect_uri}${objToParams(response)}`);
     }
 
     private async resourceOwnerCredentials(req: any, res: any): Promise<void> {
@@ -204,7 +217,7 @@ export class Server {
             return res.status(422).end('One or more scopes are not acceptable');
 
         let refreshTokenPayload: object | null = verifyToken(refresh_token, this.options.secret);
-        if(!refreshTokenPayload)
+        if (!refreshTokenPayload)
             return res.status(422).end('Refresh token is not valid');
 
         // Do database request at last to lessen db costs.

@@ -87,3 +87,11 @@ export async function parseScopes(scope: string, options: ServerOptions): Promis
     ) return null;
     return scopes;
 }
+
+export function objToParams(obj: object): string {
+    let r = '?';
+    for(const key in obj)
+        r += `${key}=${obj[key]}&`;
+
+    return r.substring(0, r.length - 1);
+}
