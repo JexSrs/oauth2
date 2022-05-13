@@ -3,26 +3,22 @@ import {GrantType} from "./types";
 export type THTokenSave = {
     accessToken: string;
     accessTokenExpiresAt: number;
-    payload: object;
     refreshToken?: string;
     refreshTokenExpiresAt?: number;
-};
-
-type THAccessTokenLoad = {
-    accessToken: string;
-    accessTokenExpiresAt: number;
-    payload: object;
-};
-
-type THRefreshTokenLoad = {
-    refreshToken: string;
-    refreshTokenExpiresAt: number;
-};
-
-type THTokenRemove = {
-    refreshToken: string;
-    refreshTokenExpiresAt: number;
     clientId: string;
+    user: any;
+};
+
+type THAccessTokenAsk = {
+    accessToken: string;
+    clientId: string;
+    user: any;
+};
+
+type THRefreshTokenAsk = {
+    refreshToken: string;
+    clientId: string;
+    user: string;
 };
 
 export type THAuthorizationCodeSave = {
@@ -31,13 +27,13 @@ export type THAuthorizationCodeSave = {
     clientId: string;
     scopes: string[];
     user: any;
-    redirect_uri: string;
+    redirectUri: string;
 };
 
 type THAuthorizationCodeAsk = {
     authorizationCode: string;
-    expiresAt: number;
     clientId: string;
+    user: string;
 };
 
 export type DatabaseFunctions = {
@@ -46,25 +42,25 @@ export type DatabaseFunctions = {
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    saveToken: (data: THTokenSave) => Promise<boolean>;
+    saveTokens: (data: THTokenSave) => Promise<boolean>;
     /**
      * The function that will load the accessToken from database.
      * @param data
      * @return {string|null} The access token if it exists or null otherwise.
      */
-    loadAccessToken: (data: THAccessTokenLoad) => Promise<string | null>;
+    getAccessToken: (data: THAccessTokenAsk) => Promise<string | null>;
     /**
      * The function that will load th refreshToken from database.
      * @param data
      * @return {string|null} The refresh token if it exists or null otherwise.
      */
-    loadRefreshToken: (data: THRefreshTokenLoad) => Promise<string | null>;
+    getRefreshToken: (data: THRefreshTokenAsk) => Promise<string | null>;
     /**
      * The function that will remove the access & refresh tokens from the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    removeToken: (data: THTokenRemove) => Promise<boolean>;
+    deleteTokens: (data: THRefreshTokenAsk) => Promise<boolean>;
     /**
      * The function that will save the authorization code to the database.
      * @param data
@@ -76,13 +72,13 @@ export type DatabaseFunctions = {
      * @param data
      * @return {string|null} The authorization code if it exists or null otherwise.
      */
-    loadAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<THAuthorizationCodeSave | null>;
+    getAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<THAuthorizationCodeSave | null>;
     /**
      * The function that will remove the authorization code from the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    removeAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean>;
+    deleteAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean>;
 };
 
 export type ServerOptions = {
@@ -100,7 +96,7 @@ export type ServerOptions = {
     getToken?: (req: any) => string;
     /**
      * Override payload location (when the verification is complete where to save the verified payload,
-     * so it can be accessed later by the app). The payload will contain the client_id and the user object.
+     * so it can be accessed later by the app). The payload will be an object that contains {client_id, user, scopes}.
      * Defaults to req.payload.
      * @param req The request instance.
      * @param payload The payload that will be saved at the request instance.

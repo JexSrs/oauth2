@@ -10,7 +10,9 @@ import {
 } from "./modules/utils";
 import {memory} from "./modules/memory";
 
-
+// TODO - add code challenge at authorization code if the user wants
+//      - https://www.oauth.com/oauth2-servers/pkce/
+//      - https://www.oauth.com/playground/authorization-code-with-pkce.html
 export class Server {
 
     private readonly options: ServerOptions;
@@ -96,7 +98,7 @@ export class Server {
             clientId: client_id,
             scopes,
             user,
-            redirect_uri,
+            redirectUri: redirect_uri,
             expiresAt: Math.trunc((Date.now() + this.options.authorizationCodeLifetime * 1000) / 1000),
         });
 
@@ -120,29 +122,30 @@ export class Server {
             return res.status(403).end('Client authentication failed.');
 
         // Database verification
-        let dbCode = await this.options.tokenHandler.loadAuthorizationCode({
+        let dbCode = await this.options.tokenHandler.getAuthorizationCode({
             clientId: client_id,
             authorizationCode: code,
-            expiresAt: authCodePayload.exp
+            user: authCodePayload.user,
         });
 
         if (!dbCode || dbCode.authorizationCode !== code)
             return res.status(401).end('Authorization code is not valid.');
 
-        if (redirect_uri !== dbCode.redirect_uri)
+        if (redirect_uri !== dbCode.redirectUri)
             return res.status(401).end('redirect_uri is not valid.');
 
         // Database delete
-        await this.options.tokenHandler.removeAuthorizationCode({
+        await this.options.tokenHandler.deleteAuthorizationCode({
             clientId: client_id,
             authorizationCode: code,
-            expiresAt: authCodePayload.exp
+            user: authCodePayload.user,
         });
 
         // Generate access & refresh tokens
         let response = await generateARTokens({
             client_id,
-            user: dbCode.user
+            user: authCodePayload.user,
+            scopes: authCodePayload.scopes
         }, authCodePayload.scopes, req, this.options);
         res.status(200).json(response);
     }
@@ -164,7 +167,7 @@ export class Server {
             return res.status(401).end('redirect_uri is not registered');
 
         let user = this.options.getUser(req);
-        let payload = {client_id, user};
+        let payload = {client_id, user, scopes};
         // Generate access & refresh tokens
         let response = await generateARTokens(payload, scopes, req, this.options);
         res.redirect(`${redirect_uri}${objToParams(response)}`);
@@ -189,7 +192,7 @@ export class Server {
             return res.status(403).end('Client authentication failed.');
 
         let user = this.options.getUser(req);
-        let payload = {client_id, user};
+        let payload = {client_id, user, scopes};
         // Generate access & refresh tokens
         let response = await generateARTokens(payload, scopes, req, this.options);
         res.status(200).json(response);
@@ -209,7 +212,7 @@ export class Server {
             return res.status(403).end('Client authentication failed.');
 
         // Generate access & refresh tokens
-        let response = await generateARTokens({client_id}, scopes, req, this.options);
+        let response = await generateARTokens({client_id, scopes}, scopes, req, this.options);
         delete response.refresh_token;
         delete response.refresh_token_expires_in;
         res.status(200).json(response);
@@ -220,15 +223,17 @@ export class Server {
         let {scope, refresh_token} = req.body;
         if(!client_id) client_id = req.body.client_id;
 
-        // Check scopes
-        // TODO - Check if scopes are the same or less than before (when created access code)
-        let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, 'refresh-token', this.options)) == null)
-            return res.status(401).end('One or more scopes are not acceptable');
-
         let refreshTokenPayload: any = verifyToken(refresh_token, this.options.secret);
         if (!refreshTokenPayload)
             return res.status(401).end('Refresh token is not valid');
+
+        // Check scopes - No need to check with app because the new scopes must
+        // be subset of the refreshTokenPayload.scopes
+        let scopes: string[] | null = scope.split(this.options.scopeDelimiter);
+        if(refreshTokenPayload.scopes.some(v => !scopes.includes(v))) {
+            res.status(403).end('Authentication failed.')
+            return;
+        }
 
         if(refreshTokenPayload.client_id !== client_id)
             return res.status(401).end('Refresh token does not belong to client');
@@ -237,15 +242,23 @@ export class Server {
         if (client_secret && !(await this.options.validateClient(client_id, client_secret)))
             return res.status(401).end('Client authentication failed.');
 
-        // Remove old tokens from database
-        // TODO - rethink how to remove from database
-        await this.options.tokenHandler.removeToken({
+        let dbToken = await this.options.tokenHandler.getRefreshToken({
             refreshToken: refresh_token,
-            refreshTokenExpiresAt: refreshTokenPayload.exp,
-            clientId: client_id
+            clientId: client_id,
+            user: refreshTokenPayload.user,
         });
 
-        let response = await generateARTokens({client_id}, scopes, req, this.options);
+        if(!dbToken || dbToken !== refresh_token)
+            return res.status(401).end('Refresh token is not valid');
+
+        // Remove old tokens from database
+        await this.options.tokenHandler.deleteTokens({
+            refreshToken: refresh_token,
+            clientId: client_id,
+            user: refreshTokenPayload.user
+        });
+
+        let response = await generateARTokens({client_id, scopes}, scopes, req, this.options);
         res.status(200).json(response);
     }
 
@@ -297,15 +310,39 @@ export class Server {
         };
     }
 
-    public authenticate(): ExpressMiddleware {
-        return (req, res, next) => {
+    public authenticate(scope: string | string[]): ExpressMiddleware {
+        let scopes: string[] = Array.isArray(scope) ? scope : scope.split(/, */);
+        return async (req, res, next) => {
+            let token = this.options.getToken(req);
 
+            let payload: any = verifyToken(token, this.options.secret);
+            if(!payload) {
+                res.status(403).end('Authentication failed.')
+                return;
+            }
+
+            if(payload.scopes.some(v => !scopes.includes(v))) {
+                res.status(403).end('Authentication failed.')
+                return;
+            }
+
+            let dbToken = await this.options.tokenHandler.getAccessToken({
+                accessToken: token,
+                clientId: payload.client_id,
+                user: payload.user
+            });
+
+            if(!dbToken || dbToken !== token) {
+                res.status(403).end('Authentication failed.')
+                return;
+            }
+
+            this.options.payloadLocation(req, {
+                client_id: payload.client_id,
+                user: payload.user,
+                scopes: payload.scopes,
+            });
+            next();
         };
     }
 }
-
-// CL_ID: bJB3Ew6UAw0Ylc6f6oLCMzGw
-// CL_SC: eVYsXtk-269Zo1en07T4CTCdJWLQU65zF-Jn85rgCZm4Gq6B
-
-// US_US: clear-cormorant@example.com
-// US_PS: Bad-Kouprey-60

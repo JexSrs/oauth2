@@ -49,12 +49,13 @@ export async function generateARTokens(payload: object, scopes: string[], req: a
         refreshToken = signToken(refreshTokenPayload, options.secret, options.refreshTokenLifetime ?? undefined);
 
     // Database save
-    await options.tokenHandler.saveToken({
+    await options.tokenHandler.saveTokens({
         accessToken,
         accessTokenExpiresAt: Math.trunc((Date.now() + options.accessTokenLifetime * 1000) / 1000),
         refreshToken,
         refreshTokenExpiresAt: Math.trunc((Date.now() + options.refreshTokenLifetime * 1000) / 1000),
-        payload: accessTokenPayload,
+        clientId: (payload as any).client_id,
+        user: (payload as any).user,
     });
 
     return {

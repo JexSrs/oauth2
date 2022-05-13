@@ -4,20 +4,16 @@ export function memory(): DatabaseFunctions {
     const tokenDB: THTokenSave[] = [];
     const authCodeDB: THAuthorizationCodeSave[] = [];
     return {
-        saveToken: async data => {
+        saveTokens: async data => {
             tokenDB.push(data);
             return true;
         },
-        loadAccessToken: async data => [...tokenDB].find(a =>
-            data.accessToken === a.accessToken
-            && data.accessTokenExpiresAt === a.accessTokenExpiresAt)?.accessToken,
-        loadRefreshToken: async data => [...tokenDB].find(a =>
-            data.refreshToken === a.refreshToken
-            && data.refreshTokenExpiresAt === a.refreshTokenExpiresAt)?.refreshToken,
-        removeToken: async data => {
+        getAccessToken: async data => [...tokenDB].find(a => data.accessToken === a.accessToken)?.accessToken,
+        getRefreshToken: async data => [...tokenDB].find(a => data.refreshToken === a.refreshToken
+            && data.clientId === a.clientId)?.refreshToken,
+        deleteTokens: async data => {
             let index = tokenDB.findIndex(a =>
-                data.accessToken === a.accessToken
-                && data.accessTokenExpiresAt === a.accessTokenExpiresAt);
+                data.refreshToken === a.refreshToken && data.clientId === a.clientId);
             if(index !== -1)
                 tokenDB.splice(index, 1);
             return true;
@@ -26,13 +22,9 @@ export function memory(): DatabaseFunctions {
             authCodeDB.push(data);
             return true;
         },
-        loadAuthorizationCode: async data => [...authCodeDB].find(a =>
-            data.authorizationCode === a.authorizationCode
-            && data.expiresAt === a.expiresAt),
-        removeAuthorizationCode: async data => {
-            let index = authCodeDB.findIndex(a =>
-                data.authorizationCode === a.authorizationCode
-                && data.expiresAt === a.expiresAt);
+        getAuthorizationCode: async data => [...authCodeDB].find(a => data.authorizationCode === a.authorizationCode),
+        deleteAuthorizationCode: async data => {
+            let index = authCodeDB.findIndex(a => data.authorizationCode === a.authorizationCode);
             if(index !== -1)
                 authCodeDB.splice(index, 1);
             return true;
