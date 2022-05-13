@@ -161,30 +161,30 @@ export class Server {
         if (!(await this.options.validateRedirectUri(client_id, redirect_uri)))
             return res.status(401).end('redirect_uri is not registered');
 
-        // Generate access & refresh tokens
         let user = this.options.getUser(req);
         let payload = {client_id, user};
+        // Generate access & refresh tokens
         let response = await generateARTokens(payload, scopes, req, this.options);
         res.redirect(`${redirect_uri}${objToParams(response)}`);
     }
 
     private async resourceOwnerCredentials(req: any, res: any): Promise<void> {
         let {client_id, client_secret} = getCredentials(req);
-        let {username, password, scope} = req.body;
-
+        let {username, password, scope} = req.body; // user validation is not going to happen
+                                                    // from the library (e.x. SRP implementation)
         // Check scopes
         let scopes: string[] | null;
         if ((scopes = await parseScopes(scope, this.options)) == null)
             return res.status(422).end('One or more scopes are not acceptable');
 
         // Do database request at last to lessen db costs.
-        if (!(await this.options.validateClient(client_id, client_secret, null)))
+        if (!(await this.options.validateClient(client_id, client_secret)))
             return res.status(403).end('Client authentication failed.');
 
-        if (!(await this.options.validateUser(username, password)))
-            return res.status(403).end('Client authentication failed.');
-
-        let response = await generateARTokens(client_id, scopes, req, this.options);
+        let user = this.options.getUser(req);
+        let payload = {client_id, user};
+        // Generate access & refresh tokens
+        let response = await generateARTokens(payload, scopes, req, this.options);
         res.status(200).json(response);
     }
 

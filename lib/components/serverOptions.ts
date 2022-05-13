@@ -160,7 +160,11 @@ export type ServerOptions = {
      * Defaults to 8 characters.
      */
     minStateLength?: number;
-
+    /** Validate that the redirect uri matches the client.
+     * @param client_id
+     * @param redirect_uri
+     * @return True if validation passes, false otherwise.
+     */
     validateRedirectUri: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
@@ -169,10 +173,4 @@ export type ServerOptions = {
      * @return boolean True if validation succeeds, false otherwise.
      */
     validateClient: (client_id: string, client_secret: string) => Promise<boolean>;
-    /**
-     * Checks if user's credentials are valid.
-     * @param username
-     * @param password
-     */
-    validateUser: (username: string, password: string) => Promise<boolean>;
 };
