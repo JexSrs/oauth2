@@ -51,10 +51,10 @@ export async function generateARTokens(payload: object, scopes: string[], req: a
     // Database save
     await options.database.saveToken({
         accessToken,
-        payload: accessTokenPayload,
         accessTokenExpiresAt: Math.trunc((Date.now() + options.accessTokenLifetime * 1000) / 1000),
         refreshToken,
         refreshTokenExpiresAt: Math.trunc((Date.now() + options.refreshTokenLifetime * 1000) / 1000),
+        payload: accessTokenPayload,
     });
 
     return {

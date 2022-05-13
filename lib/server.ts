@@ -30,8 +30,8 @@ export class Server {
                 throw new Error('accessTokenLifetime is not positive integer.')
         } else opts.accessTokenLifetime = 86400;
 
-        if (typeof opts.allowRefreshToken === 'undefined')
-            opts.allowRefreshToken = true;
+        if (typeof opts.issueRefreshToken === 'undefined')
+            opts.issueRefreshToken = opts.allowedGrantTypes.includes('refresh-token');
 
         if (typeof opts.refreshTokenLifetime === 'undefined')
             opts.refreshTokenLifetime = 864000;
@@ -166,9 +166,14 @@ export class Server {
     }
 
     private async resourceOwnerCredentials(req: any, res: any): Promise<void> {
+        // This will be removed in OAuth2.1 because this grant is very limiting
+        // and poses security risks.
+        // We removed username, password checks to allow other authentication types (such as SRP)
+        // and security handling such as brute force attacks.
+
         let {client_id, client_secret} = getCredentials(req);
-        let {username, password, scope} = req.body; // user validation is not going to happen
-                                                    // from the library (e.x. SRP implementation)
+        let {username, password, scope} = req.body;
+
         // Check scopes
         let scopes: string[] | null;
         if ((scopes = await parseScopes(scope, 'resource-owner-credentials', this.options)) == null)
@@ -208,31 +213,45 @@ export class Server {
     private async refreshToken(req: any, res: any): Promise<void> {
         let {client_id, client_secret} = getCredentials(req);
         let {scope, refresh_token} = req.body;
+        if(!client_id) client_id = req.body.client_id;
 
         // Check scopes
+        // TODO - Check if scopes are the same or less than before (when created access code)
         let scopes: string[] | null;
         if ((scopes = await parseScopes(scope, 'refresh-token', this.options)) == null)
-            return res.status(422).end('One or more scopes are not acceptable');
+            return res.status(401).end('One or more scopes are not acceptable');
 
-        let refreshTokenPayload: object | null = verifyToken(refresh_token, this.options.secret);
+        let refreshTokenPayload: any = verifyToken(refresh_token, this.options.secret);
         if (!refreshTokenPayload)
-            return res.status(422).end('Refresh token is not valid');
+            return res.status(401).end('Refresh token is not valid');
 
-        // Do database request at last to lessen db costs.
-        if (!(await this.options.validateClient(client_id, client_secret)))
-            return res.status(403).end('Client authentication failed.');
+        if(refreshTokenPayload.client_id !== client_id)
+            return res.status(401).end('Refresh token does not belong to client');
 
-        // Generate tokens
-        // Remove tokens
-        // Add new tokens
+        // If client_secret was passed then verify client (else it will be verified by the access token).
+        if (client_secret && !(await this.options.validateClient(client_id, client_secret)))
+            return res.status(401).end('Client authentication failed.');
 
-        // let response = await generateARTokens(client_id, scopes, req, this.options);
-        // res.status(200).json(response);
+        // Remove old tokens from database
+        // TODO - rethink how to remove from database
+        await this.options.database.removeToken({
+            refreshToken: refresh_token,
+            refreshTokenExpiresAt: refreshTokenPayload.exp,
+            clientId: client_id
+        });
+
+        let response = await generateARTokens({client_id}, scopes, req, this.options);
+        res.status(200).json(response);
     }
 
     public authorize(): ExpressMiddleware {
         return (req, res, next) => {
             let responseType = req.params.response_type;
+            if(!this.options.allowedGrantTypes.includes(responseType)) {
+                res.status(422).end('Invalid response_type.');
+                return;
+            }
+
             switch (responseType) {
                 case 'code': // Authorization Code - step 1
                     allowedMethod(req, res, 'GET', this.authorizationCode1.bind(this))
@@ -249,6 +268,11 @@ export class Server {
     public token(): ExpressMiddleware {
         return (req, res, next) => {
             let grantType = req.body.grant_type;
+            if(!this.options.allowedGrantTypes.includes(grantType)) {
+                res.status(422).end('Invalid grant_type.');
+                return;
+            }
+
             switch (grantType) {
                 case 'authorization_code': // Authorization Code - step 2
                     allowedMethod(req, res, 'POST', this.authorizationCode2.bind(this))

@@ -20,9 +20,9 @@ type DBRefreshTokenLoad = {
 };
 
 type DBTokenRemove = {
-    accessToken: string;
-    accessTokenExpiresAt: number;
-    payload: object;
+    refreshToken: string;
+    refreshTokenExpiresAt: number;
+    clientId: string;
 };
 
 export type DBAuthorizationCodeSave = {
@@ -39,7 +39,6 @@ type DBAuthorizationCodeAsk = {
     expiresAt: number;
     clientId: string;
 };
-
 
 export type DatabaseFunctions = {
     /**
@@ -89,6 +88,7 @@ export type DatabaseFunctions = {
 export type ServerOptions = {
     /**
      * Enabled grant types.
+     * Which grant types will be available for the app.
      * Defaults to ['authorization-code', 'resource-owner-credentials', 'refresh-token'].
      */
     allowedGrantTypes?: GrantType[];
@@ -111,10 +111,10 @@ export type ServerOptions = {
      */
     accessTokenLifetime?: number | null;
     /**
-     * Whether a refresh token will be generated alongside the access token.
-     * Defaults to true.
+     * Whether a refresh token will be issued alongside the access token.
+     * Defaults to if 'refresh-token' grant type is allowed.
      */
-    allowRefreshToken?: boolean;
+    issueRefreshToken?: boolean;
     /**
      * The refresh token's lifetime in seconds.
      * If set to null, then the token will never expire.
