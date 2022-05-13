@@ -3,7 +3,6 @@ import {ExpressMiddleware} from "./components/types";
 import {
     allowedMethod,
     generateARTokens,
-    getCredentials,
     objToParams,
     parseScopes,
     signToken,
@@ -19,11 +18,28 @@ export class Server {
     constructor(options?: ServerOptions) {
         let opts: Partial<ServerOptions> = options || {};
 
-        if (!opts.allowedGrantTypes)
-            opts.allowedGrantTypes = ['authorization-code', 'resource-owner-credentials', 'refresh-token'];
+        if (!opts.grantTypes)
+            opts.grantTypes = ['authorization-code', 'resource-owner-credentials', 'refresh-token'];
 
         if (!opts.getToken)
             opts.getToken = (req) => req.headers['authorization'];
+
+        if (!opts.payloadLocation)
+            opts.payloadLocation = (req, payload) => req.payload = payload;
+
+        if (!opts.minStateLength)
+            opts.minStateLength = 8;
+
+        if(!opts.getClientCredentials)
+            opts.getClientCredentials = (req: any) => {
+                let authHeader = req.headers['authorization'];
+                let decoded = authHeader
+                    && Buffer.from(authHeader, 'base64').toString()
+                    || '';
+
+                let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
+                return {client_id, client_secret};
+            };
 
         if (typeof opts.accessTokenLifetime !== 'undefined') {
             if (opts.accessTokenLifetime <= 0 || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime)
@@ -31,7 +47,7 @@ export class Server {
         } else opts.accessTokenLifetime = 86400;
 
         if (typeof opts.issueRefreshToken === 'undefined')
-            opts.issueRefreshToken = opts.allowedGrantTypes.includes('refresh-token');
+            opts.issueRefreshToken = opts.grantTypes.includes('refresh-token');
 
         if (typeof opts.refreshTokenLifetime === 'undefined')
             opts.refreshTokenLifetime = 864000;
@@ -43,22 +59,11 @@ export class Server {
         else if (opts.authorizationCodeLifetime <= 0 || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
             throw new Error('authorizationCodeLifetime is not positive integer.')
 
-        if (!opts.payloadLocation)
-            opts.payloadLocation = (req, payload) => req.oauth2 = payload;
-
-        if (!opts.getUser)
-            opts.getUser = req => {
-                return {};
-            };
-
-        if (!opts.database)
-            opts.database = memory();
+        if (!opts.tokenHandler)
+            opts.tokenHandler = memory();
 
         if (!opts.scopeDelimiter)
             opts.scopeDelimiter = ' ';
-
-        if (!opts.minStateLength)
-            opts.minStateLength = 8;
 
         this.options = opts as ServerOptions;
     }
@@ -86,7 +91,7 @@ export class Server {
         let user = this.options.getUser(req);
         let payload = {client_id, user};
         let code = signToken(payload, this.options.secret, this.options.authorizationCodeLifetime);
-        await this.options.database.saveAuthorizationCode({
+        await this.options.tokenHandler.saveAuthorizationCode({
             authorizationCode: code,
             clientId: client_id,
             scopes,
@@ -99,7 +104,7 @@ export class Server {
     }
 
     private async authorizationCode2(req: any, res: any): Promise<void> {
-        let {client_id, client_secret} = getCredentials(req);
+        let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {code, redirect_uri} = req.body;
 
         // Token verification
@@ -115,7 +120,7 @@ export class Server {
             return res.status(403).end('Client authentication failed.');
 
         // Database verification
-        let dbCode = await this.options.database.loadAuthorizationCode({
+        let dbCode = await this.options.tokenHandler.loadAuthorizationCode({
             clientId: client_id,
             authorizationCode: code,
             expiresAt: authCodePayload.exp
@@ -128,7 +133,7 @@ export class Server {
             return res.status(401).end('redirect_uri is not valid.');
 
         // Database delete
-        await this.options.database.removeAuthorizationCode({
+        await this.options.tokenHandler.removeAuthorizationCode({
             clientId: client_id,
             authorizationCode: code,
             expiresAt: authCodePayload.exp
@@ -171,7 +176,7 @@ export class Server {
         // We removed username, password checks to allow other authentication types (such as SRP)
         // and security handling such as brute force attacks.
 
-        let {client_id, client_secret} = getCredentials(req);
+        let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {username, password, scope} = req.body;
 
         // Check scopes
@@ -191,7 +196,7 @@ export class Server {
     }
 
     private async clientCredentials(req: any, res: any): Promise<void> {
-        let {client_id, client_secret} = getCredentials(req);
+        let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {scope} = req.body;
 
         // Check scopes
@@ -211,7 +216,7 @@ export class Server {
     }
 
     private async refreshToken(req: any, res: any): Promise<void> {
-        let {client_id, client_secret} = getCredentials(req);
+        let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {scope, refresh_token} = req.body;
         if(!client_id) client_id = req.body.client_id;
 
@@ -234,7 +239,7 @@ export class Server {
 
         // Remove old tokens from database
         // TODO - rethink how to remove from database
-        await this.options.database.removeToken({
+        await this.options.tokenHandler.removeToken({
             refreshToken: refresh_token,
             refreshTokenExpiresAt: refreshTokenPayload.exp,
             clientId: client_id
@@ -247,7 +252,7 @@ export class Server {
     public authorize(): ExpressMiddleware {
         return (req, res, next) => {
             let responseType = req.params.response_type;
-            if(!this.options.allowedGrantTypes.includes(responseType)) {
+            if(!this.options.grantTypes.includes(responseType)) {
                 res.status(422).end('Invalid response_type.');
                 return;
             }
@@ -268,7 +273,7 @@ export class Server {
     public token(): ExpressMiddleware {
         return (req, res, next) => {
             let grantType = req.body.grant_type;
-            if(!this.options.allowedGrantTypes.includes(grantType)) {
+            if(!this.options.grantTypes.includes(grantType)) {
                 res.status(422).end('Invalid grant_type.');
                 return;
             }

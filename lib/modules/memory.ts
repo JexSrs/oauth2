@@ -1,8 +1,8 @@
-import {DatabaseFunctions, DBAuthorizationCodeSave, DBTokenSave} from "../components/serverOptions";
+import {DatabaseFunctions, THAuthorizationCodeSave, THTokenSave} from "../components/serverOptions";
 
 export function memory(): DatabaseFunctions {
-    const tokenDB: DBTokenSave[] = [];
-    const authCodeDB: DBAuthorizationCodeSave[] = [];
+    const tokenDB: THTokenSave[] = [];
+    const authCodeDB: THAuthorizationCodeSave[] = [];
     return {
         saveToken: async data => {
             tokenDB.push(data);

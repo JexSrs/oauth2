@@ -1,6 +1,6 @@
 import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
-import {ARTokensResponse, ClientCredentials, GrantType} from "../components/types";
+import {ARTokensResponse, GrantType} from "../components/types";
 
 export async function allowedMethod(req: any, res: any, method: string, cb: any) {
     if(req.method === method)
@@ -43,13 +43,13 @@ export async function generateARTokens(payload: object, scopes: string[], req: a
         type: 'refreshToken'
     };
 
-    let accessToken: string = signToken(accessTokenPayload, options.secret, options.accessTokenLifetime);
+    let accessToken: string = signToken(accessTokenPayload, options.secret, options.accessTokenLifetime ?? undefined);
     let refreshToken: string | undefined;
     if(this.options.allowRefreshToken)
-        refreshToken = signToken(refreshTokenPayload, options.secret, options.refreshTokenLifetime);
+        refreshToken = signToken(refreshTokenPayload, options.secret, options.refreshTokenLifetime ?? undefined);
 
     // Database save
-    await options.database.saveToken({
+    await options.tokenHandler.saveToken({
         accessToken,
         accessTokenExpiresAt: Math.trunc((Date.now() + options.accessTokenLifetime * 1000) / 1000),
         refreshToken,
@@ -63,19 +63,6 @@ export async function generateARTokens(payload: object, scopes: string[], req: a
         expires_in: options.accessTokenLifetime,
         refresh_token: refreshToken,
         refresh_token_expires_in: refreshToken ? options.refreshTokenLifetime : undefined,
-    };
-}
-
-export function getCredentials(req: any): ClientCredentials {
-    let authHeader = req.headers['authorization'];
-    let decoded = authHeader
-        && Buffer.from(authHeader, 'base64').toString()
-        || '';
-
-    let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
-    return {
-        client_id: client_id || '',
-        client_secret: client_secret || ''
     };
 }
 

@@ -1,6 +1,6 @@
 import {GrantType} from "./types";
 
-export type DBTokenSave = {
+export type THTokenSave = {
     accessToken: string;
     accessTokenExpiresAt: number;
     payload: object;
@@ -8,24 +8,24 @@ export type DBTokenSave = {
     refreshTokenExpiresAt?: number;
 };
 
-type DBAccessTokenLoad = {
+type THAccessTokenLoad = {
     accessToken: string;
     accessTokenExpiresAt: number;
     payload: object;
 };
 
-type DBRefreshTokenLoad = {
+type THRefreshTokenLoad = {
     refreshToken: string;
     refreshTokenExpiresAt: number;
 };
 
-type DBTokenRemove = {
+type THTokenRemove = {
     refreshToken: string;
     refreshTokenExpiresAt: number;
     clientId: string;
 };
 
-export type DBAuthorizationCodeSave = {
+export type THAuthorizationCodeSave = {
     authorizationCode: string;
     expiresAt: number;
     clientId: string;
@@ -34,7 +34,7 @@ export type DBAuthorizationCodeSave = {
     redirect_uri: string;
 };
 
-type DBAuthorizationCodeAsk = {
+type THAuthorizationCodeAsk = {
     authorizationCode: string;
     expiresAt: number;
     clientId: string;
@@ -46,62 +46,80 @@ export type DatabaseFunctions = {
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    saveToken: (data: DBTokenSave) => Promise<boolean>;
+    saveToken: (data: THTokenSave) => Promise<boolean>;
     /**
      * The function that will load the accessToken from database.
      * @param data
      * @return {string|null} The access token if it exists or null otherwise.
      */
-    loadAccessToken: (data: DBAccessTokenLoad) => Promise<string | null>;
+    loadAccessToken: (data: THAccessTokenLoad) => Promise<string | null>;
     /**
      * The function that will load th refreshToken from database.
      * @param data
      * @return {string|null} The refresh token if it exists or null otherwise.
      */
-    loadRefreshToken: (data: DBRefreshTokenLoad) => Promise<string | null>;
+    loadRefreshToken: (data: THRefreshTokenLoad) => Promise<string | null>;
     /**
      * The function that will remove the access & refresh tokens from the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    removeToken: (data: DBTokenRemove) => Promise<boolean>;
+    removeToken: (data: THTokenRemove) => Promise<boolean>;
     /**
      * The function that will save the authorization code to the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    saveAuthorizationCode: (data: DBAuthorizationCodeSave) => Promise<boolean>;
+    saveAuthorizationCode: (data: THAuthorizationCodeSave) => Promise<boolean>;
     /**
      * The function that will load the authorization code from database.
      * @param data
      * @return {string|null} The authorization code if it exists or null otherwise.
      */
-    loadAuthorizationCode: (data: DBAuthorizationCodeAsk) => Promise<DBAuthorizationCodeSave | null>;
+    loadAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<THAuthorizationCodeSave | null>;
     /**
      * The function that will remove the authorization code from the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    removeAuthorizationCode: (data: DBAuthorizationCodeAsk) => Promise<boolean>;
+    removeAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean>;
 };
 
 export type ServerOptions = {
     /**
-     * Enabled grant types.
      * Which grant types will be available for the app.
      * Defaults to ['authorization-code', 'resource-owner-credentials', 'refresh-token'].
      */
-    allowedGrantTypes?: GrantType[];
+    grantTypes?: GrantType[];
     /**
-     * Override token location.
+     * Override token location during authentication.
      * Defaults to req.headers['authorization'].
      * @param req The request instance.
      * @return string The token that the client passed.
      */
     getToken?: (req: any) => string;
     /**
-     * The token secret that will be used to sign the tokens.
-     * This will be used only if default implementation is used for token sign/verification.
+     * Override payload location (when the verification is complete where to save the verified payload,
+     * so it can be accessed later by the app). The payload will contain the client_id and the user object.
+     * Defaults to req.payload.
+     * @param req The request instance.
+     * @param payload The payload that will be saved at the request instance.
+     */
+    payloadLocation?: (req: any, payload: object) => void;
+    /**
+     * Specify the minimum state length that the client will send during authorization.
+     * Defaults to 8 characters.
+     */
+    minStateLength?: number;
+    /**
+     * Override client credentials location.
+     * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
+     * @param req
+     * @return the client_id and client_secret.
+     */
+    getClientCredentials?: (req: any) => { client_id?: string | null; client_secret?: string | null; };
+    /**
+     * The token secret that will be used to sign the tokens using JSONWebToken (JWT).
      */
     secret: string;
     /**
@@ -127,41 +145,30 @@ export type ServerOptions = {
      */
     authorizationCodeLifetime?: number;
     /**
-     * Override payload location (when the verification is complete where to save the verified payload,
-     * so it can be accessed later by the app).
-     * Defaults to req.oauth2.
-     * @param req The request instance.
-     * @param payload The payload that will be saved at the request instance.
+     * Override the database's functions needed for storing and accessing the tokens.
+     * Defaults to memory.
      */
-    payloadLocation?: (req: any, payload: object) => void;
+    tokenHandler?: DatabaseFunctions;
     /**
-     * Get authenticated user identification (most likely and id).
+     * Get an identification of the user that was authenticated in this request.
      * This will be included in payloads so do not add sensitive data.
      * @param req The request instance.
      * @return The user's identification.
      */
-    getUser: (req: any) => string | string[] | object | object[] | number | number[];
-    /**
-     * Override the database's functions needed for storing and accessing the tokens.
-     * Defaults to memory.
-     */
-    database?: DatabaseFunctions;
-    /**
-     * Set an array of valid scopes, if the client sends one or more scopes that are not
-     * listed here, it will respond with the appropriate error message.
-     */
-    isScopeValid: (scope: string, grantType: GrantType) => Promise<boolean>;
+    getUser: (req: any) => string | object | number | (string | object | number | boolean)[];
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults tp ' ' (one space character).
      */
     scopeDelimiter?: string;
     /**
-     * Specify the minimum state length that the client will send during authorization.
-     * Defaults to 8 characters.
+     * A function that asks if a scope is valid. Not if permitted, this will be handled by the user.
+     * This function will make multiple calls if more than one scopes where passed during authorization.
+     * @param scope
+     * @param grantType The grant type where the function was called.
      */
-    minStateLength?: number;
-    /** Validate that the redirect uri matches the client.
+    isScopeValid: (scope: string, grantType: GrantType) => (Promise<boolean> | boolean);
+    /** Validate that the redirect uri that was passed during authorization is registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
      * @return True if validation passes, false otherwise.
@@ -171,7 +178,7 @@ export type ServerOptions = {
      * Validates that the client in question is registered.
      * @param client_id The client's id.
      * @param client_secret The client's secret.
-     * @return boolean True if validation succeeds, false otherwise.
+     * @return True if validation succeeds, false otherwise.
      */
     validateClient: (client_id: string, client_secret: string) => Promise<boolean>;
 };
