@@ -54,9 +54,6 @@ export class Server {
         if (!opts.database)
             opts.database = memory();
 
-        if (!opts.acceptedScopes)
-            opts.acceptedScopes = ['read', 'write'];
-
         if (!opts.scopeDelimiter)
             opts.scopeDelimiter = ' ';
 
@@ -75,7 +72,7 @@ export class Server {
 
         // Check scopes
         let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, this.options)) == null)
+        if ((scopes = await parseScopes(scope, 'authorization-code', this.options)) == null)
             return res.status(401).end('One or more scopes are not acceptable');
 
         if (!client_id || !redirect_uri)
@@ -154,7 +151,7 @@ export class Server {
 
         // Check scopes
         let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, this.options)) == null)
+        if ((scopes = await parseScopes(scope, 'implicit', this.options)) == null)
             return res.status(422).end('One or more scopes are not acceptable');
 
         // Validate redirect_uri & client_id
@@ -174,7 +171,7 @@ export class Server {
                                                     // from the library (e.x. SRP implementation)
         // Check scopes
         let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, this.options)) == null)
+        if ((scopes = await parseScopes(scope, 'resource-owner-credentials', this.options)) == null)
             return res.status(422).end('One or more scopes are not acceptable');
 
         // Do database request at last to lessen db costs.
@@ -194,14 +191,15 @@ export class Server {
 
         // Check scopes
         let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, this.options)) == null)
+        if ((scopes = await parseScopes(scope, 'client-credentials', this.options)) == null)
             return res.status(422).end('One or more scopes are not acceptable');
 
         // Do database request at last to lessen db costs.
-        if (!(await this.options.validateClient(client_id, client_secret, null)))
+        if (!(await this.options.validateClient(client_id, client_secret)))
             return res.status(403).end('Client authentication failed.');
 
-        let response = await generateARTokens(client_id, scopes, req, this.options);
+        // Generate access & refresh tokens
+        let response = await generateARTokens({client_id}, scopes, req, this.options);
         delete response.refresh_token;
         delete response.refresh_token_expires_in;
         res.status(200).json(response);
@@ -213,7 +211,7 @@ export class Server {
 
         // Check scopes
         let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, this.options)) == null)
+        if ((scopes = await parseScopes(scope, 'refresh-token', this.options)) == null)
             return res.status(422).end('One or more scopes are not acceptable');
 
         let refreshTokenPayload: object | null = verifyToken(refresh_token, this.options.secret);
@@ -221,7 +219,7 @@ export class Server {
             return res.status(422).end('Refresh token is not valid');
 
         // Do database request at last to lessen db costs.
-        if (!(await this.options.validateClient(client_id, client_secret, null)))
+        if (!(await this.options.validateClient(client_id, client_secret)))
             return res.status(403).end('Client authentication failed.');
 
         // Generate tokens
@@ -234,22 +232,13 @@ export class Server {
 
     public authorize(): ExpressMiddleware {
         return (req, res, next) => {
-            let responseType = req.params.response_type || req.body.response_type;
+            let responseType = req.params.response_type;
             switch (responseType) {
                 case 'code': // Authorization Code - step 1
                     allowedMethod(req, res, 'GET', this.authorizationCode1.bind(this))
                     break;
                 case 'token': // Implicit Grant
                     allowedMethod(req, res, 'GET', this.implicit.bind(this))
-                    break;
-                case 'password': // Resource Owner Credentials
-                    allowedMethod(req, res, 'POST', this.resourceOwnerCredentials.bind(this))
-                    break;
-                case 'client_credentials': // Client Credentials
-                    allowedMethod(req, res, 'POST', this.clientCredentials.bind(this))
-                    break;
-                case 'refresh_token': // Refresh Token
-                    allowedMethod(req, res, 'POST', this.refreshToken.bind(this))
                     break;
                 default: // THROW ERROR
                     res.status(422).end('Invalid response_type.');
@@ -259,11 +248,19 @@ export class Server {
 
     public token(): ExpressMiddleware {
         return (req, res, next) => {
-            let grantType = req.params.grant_type || req.body.grant_type;
+            let grantType = req.body.grant_type;
             switch (grantType) {
                 case 'authorization_code': // Authorization Code - step 2
                     allowedMethod(req, res, 'POST', this.authorizationCode2.bind(this))
-                    this.authorizationCode2(req, res);
+                    break;
+                case 'password': // Resource Owner Credentials
+                    allowedMethod(req, res, 'POST', this.resourceOwnerCredentials.bind(this))
+                    break;
+                case 'client_credentials': // Client Credentials
+                    allowedMethod(req, res, 'POST', this.clientCredentials.bind(this))
+                    break;
+                case 'refresh_token': // Refresh Token
+                    allowedMethod(req, res, 'POST', this.refreshToken.bind(this))
                     break;
                 default: // THROW ERROR
                     res.status(422).end('Invalid grant_type.');

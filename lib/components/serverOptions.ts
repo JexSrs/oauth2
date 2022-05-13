@@ -1,3 +1,5 @@
+import {GrantType} from "./types";
+
 export type DBTokenSave = {
     accessToken: string;
     accessTokenExpiresAt: number;
@@ -89,7 +91,7 @@ export type ServerOptions = {
      * Enabled grant types.
      * Defaults to ['authorization-code', 'resource-owner-credentials', 'refresh-token'].
      */
-    allowedGrantTypes?: ('authorization-code' | 'implicit' | 'resource-owner-credentials' | 'client-credentials' | 'refresh-token')[];
+    allowedGrantTypes?: GrantType[];
     /**
      * Override token location.
      * Defaults to req.headers['authorization'].
@@ -147,9 +149,8 @@ export type ServerOptions = {
     /**
      * Set an array of valid scopes, if the client sends one or more scopes that are not
      * listed here, it will respond with the appropriate error message.
-     * Defaults to ['read', 'write'].
      */
-    acceptedScopes?: string[] | ((scope: string) => Promise<boolean>);
+    isScopeValid: (scope: string, grantType: GrantType) => Promise<boolean>;
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults tp ' ' (one space character).

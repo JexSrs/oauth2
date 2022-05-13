@@ -12,3 +12,5 @@ export type ClientCredentials = {
     client_id: string;
     client_secret: string;
 }
+
+export type GrantType = 'authorization-code' | 'implicit' | 'resource-owner-credentials' | 'client-credentials' | 'refresh-token';

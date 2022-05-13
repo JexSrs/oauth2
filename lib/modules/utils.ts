@@ -1,10 +1,10 @@
 import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
-import {ARTokensResponse, ClientCredentials} from "../components/types";
+import {ARTokensResponse, ClientCredentials, GrantType} from "../components/types";
 
-export function allowedMethod(req: any, res: any, method: string, cb: any) {
+export async function allowedMethod(req: any, res: any, method: string, cb: any) {
     if(req.method === method)
-        cb(req, res);
+        await cb(req, res);
     else res.status(405).end('Method not allowed.');
 }
 
@@ -79,12 +79,10 @@ export function getCredentials(req: any): ClientCredentials {
     };
 }
 
-export async function parseScopes(scope: string, options: ServerOptions): Promise<string[] | null> {
+export async function parseScopes(scope: string, grantType: GrantType, options: ServerOptions): Promise<string[] | null> {
     let scopes: string[] = scope.split(options.scopeDelimiter);
-    if ((Array.isArray(options.acceptedScopes)
-            && scopes.some(s => !(options.acceptedScopes as string[]).includes(s)))
-        || await someAsync(scopes, async s => !(await (options.acceptedScopes as any)(s)))
-    ) return null;
+    if (await someAsync(scopes, async s => !(await options.isScopeValid(s, grantType))))
+        return null;
     return scopes;
 }
 
