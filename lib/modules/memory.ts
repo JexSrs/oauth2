@@ -1,8 +1,8 @@
-import {DatabaseFunctions} from "../components/serverOptions";
+import {DatabaseFunctions, DBAuthorizationCodeSave, DBTokenSave} from "../components/serverOptions";
 
 export function memory(): DatabaseFunctions {
-    const tokenDB = [];
-    const authCodeDB = [];
+    const tokenDB: DBTokenSave[] = [];
+    const authCodeDB: DBAuthorizationCodeSave[] = [];
     return {
         saveToken: async data => {
             tokenDB.push(data);
@@ -10,10 +10,10 @@ export function memory(): DatabaseFunctions {
         },
         loadAccessToken: async data => [...tokenDB].find(a =>
             data.accessToken === a.accessToken
-            && data.accessTokenExpiresAt === a.accessTokenExpiresAt),
+            && data.accessTokenExpiresAt === a.accessTokenExpiresAt)?.accessToken,
         loadRefreshToken: async data => [...tokenDB].find(a =>
             data.refreshToken === a.refreshToken
-            && data.refreshTokenExpiresAt === a.refreshTokenExpiresAt),
+            && data.refreshTokenExpiresAt === a.refreshTokenExpiresAt)?.refreshToken,
         removeToken: async data => {
             let index = tokenDB.findIndex(a =>
                 data.accessToken === a.accessToken

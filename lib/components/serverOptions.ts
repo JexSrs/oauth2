@@ -1,4 +1,4 @@
-type DBTokenSave = {
+export type DBTokenSave = {
     accessToken: string;
     accessTokenExpiresAt: number;
     payload: object;
@@ -23,26 +23,21 @@ type DBTokenRemove = {
     payload: object;
 };
 
-type DBAuthorizationCodeSave = {
+export type DBAuthorizationCodeSave = {
     authorizationCode: string;
     expiresAt: number;
     clientId: string;
     scopes: string[];
+    user: any;
+    redirect_uri: string;
 };
 
-type DBAuthorizationCodeLoad = {
+type DBAuthorizationCodeAsk = {
     authorizationCode: string;
     expiresAt: number;
     clientId: string;
-    scopes: string[];
 };
 
-type DBAuthorizationCodeRemove = {
-    authorizationCode: string;
-    expiresAt: number;
-    clientId: string;
-    scopes: string[];
-};
 
 export type DatabaseFunctions = {
     /**
@@ -80,13 +75,13 @@ export type DatabaseFunctions = {
      * @param data
      * @return {string|null} The authorization code if it exists or null otherwise.
      */
-    loadAuthorizationCode: (data: DBAuthorizationCodeLoad) => Promise<string | null>;
+    loadAuthorizationCode: (data: DBAuthorizationCodeAsk) => Promise<DBAuthorizationCodeSave | null>;
     /**
      * The function that will remove the authorization code from the database.
      * @param data
      * @return boolean True on succeed, false otherwise.
      */
-    removeAuthorizationCode: (data: DBAuthorizationCodeRemove) => Promise<boolean>;
+    removeAuthorizationCode: (data: DBAuthorizationCodeAsk) => Promise<boolean>;
 };
 
 export type ServerOptions = {
@@ -107,26 +102,6 @@ export type ServerOptions = {
      * This will be used only if default implementation is used for token sign/verification.
      */
     secret: string;
-    /**
-     * Override the token sign and verification process.
-     * It will be used to create and validate tokens such as: access token, refresh token, authorization code.
-     * Defaults to JSONWebToken implementation.
-     */
-    tokenUtils?: {
-        /**
-         * Override token generation.
-         * @param payload The payload that needs to be saved inside the token.
-         * @param expiresIn The expiration time in seconds after the token was generated. If undefined then no expiration was provided.
-         * @return string The generated token.
-         */
-        sign: (payload: object, expiresIn?: number) => string;
-        /**
-         * Override token verification.
-         * @param token The token supplied from the client.
-         * @return {object | null} The payload if the verification was succeeded or null otherwise.
-         */
-        verify: (token: string) => object | null;
-    };
     /**
      * The access token's lifetime in seconds.
      * If set to null, then the token will never expire.
@@ -158,12 +133,12 @@ export type ServerOptions = {
      */
     payloadLocation?: (req: any, payload: object) => void;
     /**
-     * Set the data that will be included at the payload.
-     * The payload will already contain the client_id that was provided during the authorization.
-     * Defaults to {}.
+     * Get authenticated user identification (most likely and id).
+     * This will be included in payloads so do not add sensitive data.
      * @param req The request instance.
+     * @return The user's identification.
      */
-    includeToPayload?: (req: any) => object;
+    getUser: (req: any) => string | string[] | object | object[] | number | number[];
     /**
      * Override the database's functions needed for storing and accessing the tokens.
      * Defaults to memory.
@@ -185,15 +160,15 @@ export type ServerOptions = {
      * Defaults to 8 characters.
      */
     minStateLength?: number;
+
+    validateRedirectUri: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
      * @param client_id The client's id.
-     * @param client_secret The client's secret. If null then there is no need to authenticate client.
-     * @param redirect_uri The redirect_uri passed by the client. This will be included in the registered check.
-     *                      If null then there is no need to check for redirect_uri.
+     * @param client_secret The client's secret.
      * @return boolean True if validation succeeds, false otherwise.
-     */ // TODO - Maybe split it?
-    validateClient: (client_id: string, client_secret: string | null, redirect_uri: string | null) => Promise<boolean>;
+     */
+    validateClient: (client_id: string, client_secret: string) => Promise<boolean>;
     /**
      * Checks if user's credentials are valid.
      * @param username

@@ -2,6 +2,12 @@ import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
 import {ARTokensResponse, ClientCredentials} from "../components/types";
 
+export function allowedMethod(req: any, res: any, method: string, cb: any) {
+    if(req.method === method)
+        cb(req, res);
+    else res.status(405).end('Method not allowed.');
+}
+
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
         algorithm: 'HS512',
@@ -9,8 +15,12 @@ export function signToken(payload: object, secret: string, expiresIn?: number): 
     });
 }
 
-export function verifyToken(token: string, secret: string): object {
-    return jwt.verify(token, secret) as any;
+export function verifyToken(token: string, secret: string): object | null {
+    try {
+        return jwt.verify(token, secret) as any;
+    } catch (e) {
+        return null;
+    }
 }
 
 export async function someAsync(arr: any[], check: (element: any) => Promise<boolean>): Promise<boolean> {
@@ -21,23 +31,22 @@ export async function someAsync(arr: any[], check: (element: any) => Promise<boo
     return false;
 }
 
-export async function generateARTokens(client_id: string, scopes: string[], req: any, options: ServerOptions): Promise<ARTokensResponse> {
+export async function generateARTokens(payload: object, scopes: string[], req: any, options: ServerOptions): Promise<ARTokensResponse> {
     let accessTokenPayload = {
-        ...options.includeToPayload(req),
-        client_id,
+        ...payload,
         scopes,
         type: 'accessToken'
     };
     let refreshTokenPayload = {
-        client_id,
+        ...payload,
         scopes,
         type: 'refreshToken'
     };
 
-    let accessToken: string = options.tokenUtils.sign(accessTokenPayload, options.accessTokenLifetime);
+    let accessToken: string = signToken(accessTokenPayload, options.secret, options.accessTokenLifetime);
     let refreshToken: string | undefined;
     if(this.options.allowRefreshToken)
-        refreshToken = options.tokenUtils.sign(refreshTokenPayload, options.refreshTokenLifetime);
+        refreshToken = signToken(refreshTokenPayload, options.secret, options.refreshTokenLifetime);
 
     // Database save
     await options.database.saveToken({
@@ -50,7 +59,7 @@ export async function generateARTokens(client_id: string, scopes: string[], req:
 
     return {
         access_token: accessToken,
-        token_type: 'bearer',
+        token_type: 'Bearer',
         expires_in: options.accessTokenLifetime,
         refresh_token: refreshToken,
         refresh_token_expires_in: refreshToken ? options.refreshTokenLifetime : undefined,
