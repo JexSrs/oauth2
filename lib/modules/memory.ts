@@ -1,6 +1,6 @@
-import {DatabaseFunctions, THAuthorizationCodeSave, THTokenSave} from "../components/serverOptions";
+import {TokenHandlerFunctions, THAuthorizationCodeSave, THTokenSave} from "../components/serverOptions";
 
-export function memory(): DatabaseFunctions {
+export function memory(): TokenHandlerFunctions {
     const tokenDB: THTokenSave[] = [];
     const authCodeDB: THAuthorizationCodeSave[] = [];
     return {

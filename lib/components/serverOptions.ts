@@ -1,4 +1,4 @@
-import {GrantType} from "./types";
+import {GrantTypes} from "./GrantTypes";
 
 export type THTokenSave = {
     accessToken: string;
@@ -36,7 +36,7 @@ type THAuthorizationCodeAsk = {
     user: string;
 };
 
-export type DatabaseFunctions = {
+export type TokenHandlerFunctions = {
     /**
      * The function that will save the access and refresh tokens to the database.
      * @param data
@@ -84,9 +84,9 @@ export type DatabaseFunctions = {
 export type ServerOptions = {
     /**
      * Which grant types will be available for the app.
-     * Defaults to ['authorization-code', 'resource-owner-credentials', 'refresh-token'].
+     * Defaults to [GrantTypes.AUTHORIZATION_CODE, GrantTypes.REFRESH_TOKEN].
      */
-    grantTypes?: GrantType[];
+    grantTypes?: GrantTypes[];
     /**
      * Override token location during authentication.
      * Defaults to req.headers['authorization'].
@@ -144,7 +144,7 @@ export type ServerOptions = {
      * Override the database's functions needed for storing and accessing the tokens.
      * Defaults to memory.
      */
-    tokenHandler?: DatabaseFunctions;
+    tokenHandler?: TokenHandlerFunctions;
     /**
      * Get an identification of the user that was authenticated in this request.
      * This will be included in payloads so do not add sensitive data.
@@ -154,7 +154,7 @@ export type ServerOptions = {
     getUser: (req: any) => string | object | number | (string | object | number | boolean)[];
     /**
      * The delimiter that will be used to split the scope string.
-     * Defaults tp ' ' (one space character).
+     * Defaults to ' ' (one space character).
      */
     scopeDelimiter?: string;
     /**
@@ -163,13 +163,13 @@ export type ServerOptions = {
      * @param scope
      * @param grantType The grant type where the function was called.
      */
-    isScopeValid: (scope: string, grantType: GrantType) => (Promise<boolean> | boolean);
+    isScopeValid: (scope: string, grantType: GrantTypes) => (Promise<boolean> | boolean);
     /** Validate that the redirect uri that was passed during authorization is registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
      * @return True if validation passes, false otherwise.
      */
-    validateRedirectUri: (client_id: string, redirect_uri: string) => Promise<boolean>;
+    validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
      * @param client_id The client's id.

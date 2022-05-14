@@ -1,6 +1,7 @@
 import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
-import {ARTokensResponse, GrantType} from "../components/types";
+import {ARTokensResponse, ErrorRequest, RedirectErrorRequest} from "../components/types";
+import {GrantTypes} from "../components/GrantTypes";
 
 export async function allowedMethod(req: any, res: any, method: string, cb: any) {
     if(req.method === method)
@@ -67,7 +68,7 @@ export async function generateARTokens(payload: object, scopes: string[], req: a
     };
 }
 
-export async function parseScopes(scope: string, grantType: GrantType, options: ServerOptions): Promise<string[] | null> {
+export async function parseScopes(scope: string, grantType: GrantTypes, options: ServerOptions): Promise<string[] | null> {
     let scopes: string[] = scope.split(options.scopeDelimiter);
     if (await someAsync(scopes, async s => !(await options.isScopeValid(s, grantType))))
         return null;
@@ -80,4 +81,21 @@ export function objToParams(obj: object): string {
         r += `${key}=${obj[key]}&`;
 
     return r.substring(0, r.length - 1);
+}
+
+export function errorPost(res: any, err: ErrorRequest, description: string) {
+    let status = 400;
+    if(err === 'invalid_client')
+        status = 401;
+
+    res.status(status).json({
+        error: err,
+        error_description: description.endsWith('.') ? description : `${description}.`,
+        error_uri: 'Please check the docs for more information.'
+    });
+}
+
+export function errorGet(res: any, err: RedirectErrorRequest, redirectUri: string, state: string, description: string) {
+    description = description.endsWith('.') ? description : `${description}.`;
+    res.redirect(`${redirectUri}?error=${err}&error_description=${description}&error_uri=${'Please check the docs for more information.'}&state=${state}`)
 }
