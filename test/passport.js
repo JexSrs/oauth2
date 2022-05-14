@@ -24,3 +24,6 @@ describe('With Encryption', function () {
 
 
 setTimeout(() => server.close(), 5000);
+
+// TODO - https://www.passportjs.org/packages/passport-oauth2/
+// TODO - https://github.com/jaredhanson/passport-oauth2/blob/master/lib/strategy.js

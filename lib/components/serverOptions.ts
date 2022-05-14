@@ -28,6 +28,8 @@ export type THAuthorizationCodeSave = {
     scopes: string[];
     user: any;
     redirectUri: string;
+    codeChallenge?: string;
+    codeChallengeMethod?: string;
 };
 
 type THAuthorizationCodeAsk = {
@@ -103,12 +105,32 @@ export type ServerOptions = {
      */
     payloadLocation?: (req: any, payload: object) => void;
     /**
+     * If the redirect_uri that was sent with the requests does start  with https://
+     * then the request will be aborted. In case you are using custom protocols, like redirect
+     * to an android app (my-app://path/to) you can disable this and do the check manually from your app.
+     * Defaults to false.
+     */
+    allowNonHTTPSRedirectURIs?: boolean;
+    /**
+     * Whether to use PKCE during authorization code flow.
+     * Defaults tp true.
+     */
+    usePKCE?: boolean;
+    /**
+     * If you are using PKCE, whether code challenge method plain is allowed
+     * or S256 is mandatory.
+     * Defaults to false.
+     */
+    allowCodeChallengeMethodPlain?: boolean;
+    /**
      * Specify the minimum state length that the client will send during authorization.
      * Defaults to 8 characters.
      */
     minStateLength?: number;
     /**
      * Override client credentials location.
+     * If the app does not send client_secret (e.x. native mobile app or spa)
+     * then set client_secret as empty string ("");
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
      * @return the client_id and client_secret.
@@ -146,6 +168,12 @@ export type ServerOptions = {
      */
     tokenHandler?: TokenHandlerFunctions;
     /**
+     * Returns true if user approved the request false otherwise.
+     * Defaults to req.userApproved.
+     * @param req The request instance.
+     */
+    getUserApproved: (req: any) => boolean;
+    /**
      * Get an identification of the user that was authenticated in this request.
      * This will be included in payloads so do not add sensitive data.
      * @param req The request instance.
@@ -172,6 +200,8 @@ export type ServerOptions = {
     validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
+     * If the app does not send client_secret (e.x. native mobile app or spa)
+     * then it is up to ou to verify if the client will be accepted.
      * @param client_id The client's id.
      * @param client_secret The client's secret.
      * @return True if validation succeeds, false otherwise.

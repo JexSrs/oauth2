@@ -1,20 +1,20 @@
 import {ServerOptions} from "./components/serverOptions";
 import {ExpressMiddleware} from "./components/types";
 import {
-    allowedMethod, errorGet,
-    errorPost,
+    buildRedirectURI,
+    encodeBase64URL,
+    errorRedirect,
+    errorBody,
     generateARTokens,
-    objToParams,
     parseScopes,
     signToken,
     verifyToken
 } from "./modules/utils";
 import {memory} from "./modules/memory";
 import {GrantTypes} from "./components/GrantTypes";
+import * as crypto from "crypto";
 
-// TODO - add code challenge at authorization code if the user wants
-//      - https://www.oauth.com/oauth2-servers/pkce/
-//      - https://www.oauth.com/playground/authorization-code-with-pkce.html
+
 export class Server {
 
     // TODO - add event listeners, maybe using .on(event, listener);
@@ -34,10 +34,19 @@ export class Server {
         if (!opts.payloadLocation)
             opts.payloadLocation = (req, payload) => req.payload = payload;
 
+        if (typeof opts.allowNonHTTPSRedirectURIs === 'undefined')
+            opts.allowNonHTTPSRedirectURIs = false;
+
+        if (typeof opts.usePKCE === 'undefined')
+            opts.usePKCE = true;
+
+        if (typeof opts.allowCodeChallengeMethodPlain === 'undefined')
+            opts.allowCodeChallengeMethodPlain = false;
+
         if (!opts.minStateLength)
             opts.minStateLength = 8;
 
-        if(!opts.getClientCredentials)
+        if (!opts.getClientCredentials)
             opts.getClientCredentials = (req: any) => {
                 let authHeader = req.headers['authorization'];
                 let decoded = authHeader
@@ -69,86 +78,83 @@ export class Server {
         if (!opts.tokenHandler)
             opts.tokenHandler = memory();
 
+        if(!opts.getUserApproved)
+            opts.getUserApproved = (req: any) => req.userApproved;
+
         if (!opts.scopeDelimiter)
             opts.scopeDelimiter = ' ';
 
         this.options = opts as ServerOptions;
     }
 
-    private async authorizationCode1(req: any, res: any): Promise<void> {
-        let {client_id, state, redirect_uri, scope} = req.params;
+    private async authorizationCode1(req: any, res: any, scopes: string[]): Promise<void> {
+        let {state, client_id, redirect_uri, code_challenge, code_challenge_method} = req.params;
 
-        // Check if state exists and is at least 8 chars
-        if (state.length < this.options.minStateLength)
-            return errorGet(res, 'invalid_request', redirect_uri, state, `state must be at least ${this.options.minStateLength} characters`)
+        // Check for PKCE
+        if (this.options.usePKCE) {
+            if (!code_challenge)
+                return errorRedirect(res, 'invalid_request', redirect_uri, state, 'Missing code challenge.')
+            if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !this.options.allowCodeChallengeMethodPlain))
+                return errorRedirect(res, 'invalid_request', redirect_uri, state, 'Code challenge method is not valid.')
+        }
 
-        // Check scopes
-        let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, GrantTypes.AUTHORIZATION_CODE, this.options)) == null)
-            return errorGet(res, 'invalid_scope', redirect_uri, state, 'One or more scopes are not acceptable');
-
-        if (!client_id || !redirect_uri)
-            return errorGet(res, 'invalid_request', redirect_uri, state, 'Missing parameters');
-
-        // Validate redirect_uri & client_id
-        if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
-            return errorGet(res, 'invalid_request', redirect_uri, state, 'redirect_uri is not registered');
-
-        // Checks are done, generate authorization code
+        // Get user from the application
         let user = this.options.getUser(req);
+
+        // Generate authorization code
         let payload = {client_id, user};
         let code = signToken(payload, this.options.secret, this.options.authorizationCodeLifetime);
+
+        // Save authorization code to database
         await this.options.tokenHandler.saveAuthorizationCode({
             authorizationCode: code,
-            clientId: client_id,
-            scopes,
-            user,
-            redirectUri: redirect_uri,
             expiresAt: Math.trunc((Date.now() + this.options.authorizationCodeLifetime * 1000) / 1000),
+            clientId: client_id,
+            redirectUri: redirect_uri,
+            user,
+            scopes,
+            codeChallenge: code_challenge,
+            codeChallengeMethod: code_challenge_method
         });
 
-        res.redirect(`${redirect_uri}?code=${code}&state=${state}`);
+        // Respond with authorization code
+        res.header('Cache-Control', 'no-store').redirect(buildRedirectURI(redirect_uri, {code, state}));
     }
 
-    private async implicit(req: any, res: any): Promise<void> { // TODO - check client-secret
-        let {client_id, state, redirect_uri, scope} = req.params;
+    private async implicit(req: any, res: any, scopes: string[]): Promise<void> {
+        let {state, scope, client_id, redirect_uri} = req.params;
 
-        // Check if state exists and is at least 8 chars
-        if (state.length < this.options.minStateLength)
-            return errorGet(res, 'invalid_request', redirect_uri, state, `state must be at least ${this.options.minStateLength} characters`);
-
-        // Check scopes
-        let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, GrantTypes.IMPLICIT, this.options)) == null)
-            return errorGet(res, 'invalid_scope', redirect_uri, state, 'One or more scopes are not acceptable');
-
-        // Validate redirect_uri & client_id
-        if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
-            return errorGet(res, 'invalid_request', redirect_uri, state, 'redirect_uri is not registered');
-
+        // Get user from the application
         let user = this.options.getUser(req);
-        let payload = {client_id, user, scopes};
+
         // Generate access & refresh tokens
-        let response = await generateARTokens(payload, scopes, req, this.options);
-        res.redirect(`${redirect_uri}${objToParams(response)}`);
+        let payload = {client_id, user, scopes};
+        let tokens = await generateARTokens(payload, scopes, req, this.options);
+
+        // Respond with tokens
+        res.header('Cache-Control', 'no-store').redirect(buildRedirectURI(redirect_uri, tokens));
     }
 
     private async authorizationCode2(req: any, res: any): Promise<void> {
         let {client_id, client_secret} = this.options.getClientCredentials(req);
-        let {code, redirect_uri} = req.body;
+        let {code, redirect_uri, code_verifier} = req.body;
+
+        // Check PKCE parameter
+        if (this.options.usePKCE && !code_verifier)
+            return errorBody(res, 'invalid_request', 'Missing code verifier')
 
         // Token verification
         let authCodePayload: any = verifyToken(code, this.options.secret);
         if (!authCodePayload)
-            return errorPost(res, 'invalid_grant', 'Authorization code is not valid or has expired');
+            return errorBody(res, 'invalid_grant', 'Authorization code is not valid or has expired');
 
         // Payload verification
         if (authCodePayload.client_id !== client_id)
-            return errorPost(res, 'invalid_grant', 'Authorization code does not belong to the client');
+            return errorBody(res, 'invalid_grant', 'Authorization code does not belong to the client');
 
         // Do database request at last to lessen db costs.
         if (!(await this.options.validateClient(client_id, client_secret)))
-            return errorPost(res, 'unauthorized_client', 'Client authentication failed');
+            return errorBody(res, 'unauthorized_client', 'Client authentication failed');
 
         // Database verification
         let dbCode = await this.options.tokenHandler.getAuthorizationCode({
@@ -158,10 +164,24 @@ export class Server {
         });
 
         if (!dbCode || dbCode.authorizationCode !== code)
-            return errorPost(res, 'invalid_grant', 'Authorization code is not valid or has expired');
+            return errorBody(res, 'invalid_grant', 'Authorization code is not valid or has expired');
 
         if (redirect_uri !== dbCode.redirectUri)
-            return errorPost(res, 'invalid_grant', 'redirect_uri is not the same that was used during authorization code grant');
+            return errorBody(res, 'invalid_grant', 'Redirect URI is not the same that was used during authorization code grant');
+
+        // Check PKCE
+        if (this.options.usePKCE) {
+            const cc = dbCode.codeChallenge;
+
+            let code = code_verifier;
+            if (dbCode.codeChallengeMethod === 'S256') {
+                code = crypto.createHash('sha256').update(code).digest('base64');
+                code = encodeBase64URL(code);
+            }
+
+            if (cc !== code)
+                return errorBody(res, 'invalid_grant', 'Code verifier is not valid')
+        }
 
         // Database delete
         await this.options.tokenHandler.deleteAuthorizationCode({
@@ -185,22 +205,14 @@ export class Server {
      * We removed username, password checks to allow other authentication types (such as SRP)
      * and security handling such as brute force attacks.
      * So make sure you authenticate the user and keep this function only for token generation.
-     * @param req
-     * @param res
-     * @private
      */
-    private async resourceOwnerCredentials(req: any, res: any): Promise<void> {
+    private async resourceOwnerCredentials(req: any, res: any, scopes: string[]): Promise<void> {
         let {client_id, client_secret} = this.options.getClientCredentials(req);
-        let {username, password, scope} = req.body;
-
-        // Check scopes
-        let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, GrantTypes.RESOURCE_OWNER_CREDENTIALS, this.options)) == null)
-            return errorPost(res, 'invalid_scope', 'One or more scopes are not acceptable');
+        let {username, password} = req.body;
 
         // Do database request at last to lessen db costs.
         if (!(await this.options.validateClient(client_id, client_secret)))
-            return errorPost(res, 'unauthorized_client', 'Client authentication failed');
+            return errorBody(res, 'unauthorized_client', 'Client authentication failed');
 
         let user = this.options.getUser(req);
         let payload = {client_id, user, scopes};
@@ -209,18 +221,12 @@ export class Server {
         res.status(200).header('Cache-Control', 'no-store').json(response);
     }
 
-    private async clientCredentials(req: any, res: any): Promise<void> {
+    private async clientCredentials(req: any, res: any, scopes: string[]): Promise<void> {
         let {client_id, client_secret} = this.options.getClientCredentials(req);
-        let {scope} = req.body;
-
-        // Check scopes
-        let scopes: string[] | null;
-        if ((scopes = await parseScopes(scope, GrantTypes.CLIENT_CREDENTIALS, this.options)) == null)
-            return errorPost(res, 'invalid_scope', 'One or more scopes are not acceptable');
 
         // Do database request at last to lessen db costs.
         if (!(await this.options.validateClient(client_id, client_secret)))
-            return errorPost(res, 'unauthorized_client', 'Client authentication failed');
+            return errorBody(res, 'unauthorized_client', 'Client authentication failed');
 
         // Generate access & refresh tokens
         let response = await generateARTokens({client_id, scopes}, scopes, req, this.options);
@@ -232,24 +238,24 @@ export class Server {
     private async refreshToken(req: any, res: any): Promise<void> {
         let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {scope, refresh_token} = req.body;
-        if(!client_id) client_id = req.body.client_id;
+        if (!client_id) client_id = req.body.client_id;
 
         let refreshTokenPayload: any = verifyToken(refresh_token, this.options.secret);
         if (!refreshTokenPayload)
-            return errorPost(res, 'invalid_grant', 'Refresh token is not valid');
+            return errorBody(res, 'invalid_grant', 'Refresh token is not valid');
 
         // Check scopes - No need to check with app because the new scopes must
         // be subset of the refreshTokenPayload.scopes
         let scopes: string[] | null = scope.split(this.options.scopeDelimiter);
-        if(refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
-            return errorPost(res, 'invalid_scope', 'One or more scopes are not acceptable');
+        if (refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
+            return errorBody(res, 'invalid_scope', 'One or more scopes are not acceptable');
 
-        if(refreshTokenPayload.client_id !== client_id)
-            return errorPost(res, 'invalid_grant', 'Refresh token does not belong to client');
+        if (refreshTokenPayload.client_id !== client_id)
+            return errorBody(res, 'invalid_grant', 'Refresh token does not belong to client');
 
         // If client_secret was passed then verify client (else it will be verified by the access token).
         if (client_secret && !(await this.options.validateClient(client_id, client_secret)))
-            return errorPost(res, 'unauthorized_client', 'Client authentication failed');
+            return errorBody(res, 'unauthorized_client', 'Client authentication failed');
 
         let dbToken = await this.options.tokenHandler.getRefreshToken({
             refreshToken: refresh_token,
@@ -257,8 +263,8 @@ export class Server {
             user: refreshTokenPayload.user,
         });
 
-        if(!dbToken || dbToken !== refresh_token)
-            return errorPost(res, 'invalid_grant', 'Refresh token is not valid');
+        if (!dbToken || dbToken !== refresh_token)
+            return errorBody(res, 'invalid_grant', 'Refresh token is not valid');
 
         // Remove old tokens from database
         await this.options.tokenHandler.deleteTokens({
@@ -275,22 +281,47 @@ export class Server {
      * Assign this function to the 'authorize' endpoint.
      */
     public authorize(): ExpressMiddleware {
-        return (req, res, next) => {
-            switch (req.params.response_type) {
-                case 'code': // Authorization Code - step 1
-                    if(!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
-                        return errorGet(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
+        return async (req, res, next) => {
+            if(req.method !== 'GET') {
+                res.status(405).end('Method not allowed.');
+                return;
+            }
 
-                    allowedMethod(req, res, 'GET', this.authorizationCode1.bind(this))
+            const {client_id, redirect_uri, state, scope, response_type} = req.params;
+
+            // Validate client_id and redirect_uri
+            if (!this.options.allowNonHTTPSRedirectURIs && !redirect_uri.startsWith('https://'))
+                return errorBody(res, 'invalid_request', 'Redirect URI is not https.');
+            if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
+                return errorBody(res, 'invalid_request', 'Client id or redirect URI are not registered');
+
+            if(!this.options.getUserApproved(req))
+                return errorRedirect(res, 'access_denied', redirect_uri, state, 'User did not approve request')
+
+            /// Check state minimum length.
+            if (state.length < this.options.minStateLength)
+                return errorRedirect(res, 'invalid_request', redirect_uri, state, `state must be at least ${this.options.minStateLength} characters`)
+
+            // Validate scopes
+            let scopes: string[] | null;
+            if ((scopes = await parseScopes(scope, GrantTypes.IMPLICIT, this.options)) == null)
+                return errorRedirect(res, 'invalid_scope', redirect_uri, state, 'One or more scopes are not acceptable');
+
+            switch (response_type) {
+                case 'code': // Authorization Code - step 1
+                    if (!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
+                        return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
+
+                    this.authorizationCode1(req, res, scopes);
                     break;
                 case 'token': // Implicit Grant
-                    if(!this.options.grantTypes.includes(GrantTypes.IMPLICIT))
-                        return errorGet(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
+                    if (!this.options.grantTypes.includes(GrantTypes.IMPLICIT))
+                        return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
 
-                    allowedMethod(req, res, 'GET', this.implicit.bind(this))
+                    this.implicit(req, res, scopes);
                     break;
                 default: // THROW ERROR
-                    return errorGet(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
+                    return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
             }
         };
     }
@@ -299,35 +330,43 @@ export class Server {
      * Assign this function to the 'token' endpoint.
      */
     public token(): ExpressMiddleware {
-        return (req, res, next) => {
-            switch (req.body.grant_type) {
-                case 'authorization_code': // Authorization Code - step 2
-                    if(!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
-                        return errorPost(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
-                    allowedMethod(req, res, 'POST', this.authorizationCode2.bind(this))
-                    break;
-                case 'password': // Resource Owner Credentials
-                    if(!this.options.grantTypes.includes(GrantTypes.RESOURCE_OWNER_CREDENTIALS))
-                        return errorPost(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
-                    allowedMethod(req, res, 'POST', this.resourceOwnerCredentials.bind(this))
-                    break;
-                case 'client_credentials': // Client Credentials
-                    if(!this.options.grantTypes.includes(GrantTypes.CLIENT_CREDENTIALS))
-                        return errorPost(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
-                    allowedMethod(req, res, 'POST', this.clientCredentials.bind(this))
-                    break;
-                case 'refresh_token': // Refresh Token
-                    if(!this.options.grantTypes.includes(GrantTypes.REFRESH_TOKEN))
-                        return errorPost(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
-                    allowedMethod(req, res, 'POST', this.refreshToken.bind(this))
-                    break;
-                default: // THROW ERROR
-                    res.status(422).end('Invalid grant_type.');
+        return async (req, res, next) => {
+            if(req.method !== 'POST') {
+                res.status(405).end('Method not allowed.');
+                return;
             }
+
+            const {grant_type, scope} = req.body;
+
+            if(grant_type === 'password' || grant_type === 'client_credentials') {
+                // Check scopes
+                let scopes: string[] | null;
+                if ((scopes = await parseScopes(scope, GrantTypes.RESOURCE_OWNER_CREDENTIALS, this.options)) == null)
+                    return errorBody(res, 'invalid_scope', 'One or more scopes are not acceptable');
+
+                if(grant_type === 'password') { // Resource Owner Credentials
+                    if (!this.options.grantTypes.includes(GrantTypes.RESOURCE_OWNER_CREDENTIALS))
+                        return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+
+                    this.resourceOwnerCredentials(req, res, scopes);
+                } else if(grant_type === 'client_credentials') { // Client Credentials
+                    if (!this.options.grantTypes.includes(GrantTypes.CLIENT_CREDENTIALS))
+                        return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+
+                    this.clientCredentials(req, res, scopes);
+                }
+            } else if (grant_type === 'authorization_code') { // Authorization Code - step 2
+                if (!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
+                    return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+
+                this.authorizationCode2(req, res);
+            } else if (grant_type === 'authorization_code') { // Refresh Token
+                if (!this.options.grantTypes.includes(GrantTypes.REFRESH_TOKEN))
+                    return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+
+                this.refreshToken(req, res);
+            } else
+                errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
         };
     }
 
@@ -342,12 +381,12 @@ export class Server {
             let token = this.options.getToken(req);
 
             let payload: any = verifyToken(token, this.options.secret);
-            if(!payload) {
+            if (!payload) {
                 res.status(403).end('Authentication failed.')
                 return;
             }
 
-            if(payload.scopes.some(v => !scopes.includes(v))) {
+            if (payload.scopes.some(v => !scopes.includes(v))) {
                 res.status(403).end('Authentication failed.')
                 return;
             }
@@ -358,7 +397,7 @@ export class Server {
                 user: payload.user
             });
 
-            if(!dbToken || dbToken !== token) {
+            if (!dbToken || dbToken !== token) {
                 res.status(403).end('Authentication failed.')
                 return;
             }

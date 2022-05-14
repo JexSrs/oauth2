@@ -4,4 +4,6 @@ export type ClientOptions = {
     clientID: string;
     clientSecret: string;
     callbackURL: string;
+
+    usePKCE: boolean;
 };
