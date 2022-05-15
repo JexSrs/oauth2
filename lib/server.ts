@@ -2,17 +2,17 @@ import {ServerOptions} from "./components/serverOptions";
 import {ExpressMiddleware} from "./components/types";
 import {
     buildRedirectURI,
-    encodeBase64URL,
-    errorRedirect,
     errorBody,
+    errorRedirect,
     generateARTokens,
+    getGrantType,
+    hash,
     parseScopes,
     signToken,
     verifyToken
 } from "./modules/utils";
 import {memory} from "./modules/memory";
 import {GrantTypes} from "./components/GrantTypes";
-import * as crypto from "crypto";
 
 
 export class Server {
@@ -78,7 +78,7 @@ export class Server {
         if (!opts.tokenHandler)
             opts.tokenHandler = memory();
 
-        if(!opts.getUserApproved)
+        if (!opts.getUserApproved)
             opts.getUserApproved = (req: any) => req.userApproved;
 
         if (!opts.scopeDelimiter)
@@ -171,16 +171,8 @@ export class Server {
 
         // Check PKCE
         if (this.options.usePKCE) {
-            const cc = dbCode.codeChallenge;
-
-            let code = code_verifier;
-            if (dbCode.codeChallengeMethod === 'S256') {
-                code = crypto.createHash('sha256').update(code).digest('base64');
-                code = encodeBase64URL(code);
-            }
-
-            if (cc !== code)
-                return errorBody(res, 'invalid_grant', 'Code verifier is not valid')
+            if (dbCode.codeChallenge !== hash((dbCode.codeChallengeMethod as any), code_verifier))
+                return errorBody(res, 'invalid_grant', 'Code verifier is not valid');
         }
 
         // Database delete
@@ -199,13 +191,6 @@ export class Server {
         res.status(200).header('Cache-Control', 'no-store').json(response);
     }
 
-    /**
-     * According to oauth.com this will be removed in OAuth2.1 because this grant is very limiting
-     * and poses security risks.
-     * We removed username, password checks to allow other authentication types (such as SRP)
-     * and security handling such as brute force attacks.
-     * So make sure you authenticate the user and keep this function only for token generation.
-     */
     private async resourceOwnerCredentials(req: any, res: any, scopes: string[]): Promise<void> {
         let {client_id, client_secret} = this.options.getClientCredentials(req);
         let {username, password} = req.body;
@@ -214,7 +199,9 @@ export class Server {
         if (!(await this.options.validateClient(client_id, client_secret)))
             return errorBody(res, 'unauthorized_client', 'Client authentication failed');
 
-        let user = this.options.getUser(req);
+        let user = await this.options.validateUser(username, password);
+        if(!user) return errorBody(res, 'invalid_grant', 'Client authentication failed');
+
         let payload = {client_id, user, scopes};
         // Generate access & refresh tokens
         let response = await generateARTokens(payload, scopes, req, this.options);
@@ -282,7 +269,7 @@ export class Server {
      */
     public authorize(): ExpressMiddleware {
         return async (req, res, next) => {
-            if(req.method !== 'GET') {
+            if (req.method !== 'GET') {
                 res.status(405).end('Method not allowed.');
                 return;
             }
@@ -295,32 +282,30 @@ export class Server {
             if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
                 return errorBody(res, 'invalid_request', 'Client id or redirect URI are not registered');
 
-            if(!this.options.getUserApproved(req))
+            if (!this.options.getUserApproved(req))
                 return errorRedirect(res, 'access_denied', redirect_uri, state, 'User did not approve request')
 
             /// Check state minimum length.
             if (state.length < this.options.minStateLength)
                 return errorRedirect(res, 'invalid_request', redirect_uri, state, `state must be at least ${this.options.minStateLength} characters`)
 
+            let gt: GrantTypes | null = getGrantType(response_type);
+            if (!gt || !this.options.grantTypes.includes(gt))
+                return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
+
             // Validate scopes
             let scopes: string[] | null;
-            if ((scopes = await parseScopes(scope, GrantTypes.IMPLICIT, this.options)) == null)
+            if ((scopes = await parseScopes(scope, gt, this.options)) == null)
                 return errorRedirect(res, 'invalid_scope', redirect_uri, state, 'One or more scopes are not acceptable');
 
             switch (response_type) {
-                case 'code': // Authorization Code - step 1
-                    if (!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
-                        return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
-
+                case 'code':
                     this.authorizationCode1(req, res, scopes);
                     break;
-                case 'token': // Implicit Grant
-                    if (!this.options.grantTypes.includes(GrantTypes.IMPLICIT))
-                        return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
-
+                case 'token':
                     this.implicit(req, res, scopes);
                     break;
-                default: // THROW ERROR
+                default:
                     return errorRedirect(res, 'unsupported_response_type', req.params.redirect_uri, req.params.state, 'response_type is not acceptable');
             }
         };
@@ -331,42 +316,33 @@ export class Server {
      */
     public token(): ExpressMiddleware {
         return async (req, res, next) => {
-            if(req.method !== 'POST') {
+            if (req.method !== 'POST') {
                 res.status(405).end('Method not allowed.');
                 return;
             }
 
             const {grant_type, scope} = req.body;
 
-            if(grant_type === 'password' || grant_type === 'client_credentials') {
+            let gt: GrantTypes | null = getGrantType(grant_type);
+            if (!gt || !this.options.grantTypes.includes(gt))
+                return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+
+            if (grant_type === 'password' || grant_type === 'client_credentials') {
                 // Check scopes
                 let scopes: string[] | null;
-                if ((scopes = await parseScopes(scope, GrantTypes.RESOURCE_OWNER_CREDENTIALS, this.options)) == null)
+                if ((scopes = await parseScopes(scope, gt, this.options)) == null)
                     return errorBody(res, 'invalid_scope', 'One or more scopes are not acceptable');
 
-                if(grant_type === 'password') { // Resource Owner Credentials
-                    if (!this.options.grantTypes.includes(GrantTypes.RESOURCE_OWNER_CREDENTIALS))
-                        return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
+                if (grant_type === 'password')
                     this.resourceOwnerCredentials(req, res, scopes);
-                } else if(grant_type === 'client_credentials') { // Client Credentials
-                    if (!this.options.grantTypes.includes(GrantTypes.CLIENT_CREDENTIALS))
-                        return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
+                else if (grant_type === 'client_credentials')
                     this.clientCredentials(req, res, scopes);
-                }
-            } else if (grant_type === 'authorization_code') { // Authorization Code - step 2
-                if (!this.options.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE))
-                    return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
+            } else if (grant_type === 'authorization_code')
                 this.authorizationCode2(req, res);
-            } else if (grant_type === 'authorization_code') { // Refresh Token
-                if (!this.options.grantTypes.includes(GrantTypes.REFRESH_TOKEN))
-                    return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
-
+            else if (grant_type === 'refresh_token')
                 this.refreshToken(req, res);
-            } else
-                errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+            else
+                return errorBody(res, 'unsupported_grant_type', 'grant_type is not acceptable');
         };
     }
 
@@ -374,8 +350,10 @@ export class Server {
      * Authenticate request.
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *                  then the authentication will fail.
+     * @param acceptAllScope If this parameter is set to a global scope (e.x. 'all' or 'global' etc.) and the
+     *                  access token contains this scope, it will not check for the rest of scopes.
      */
-    public authenticate(scope: string | string[]): ExpressMiddleware {
+    public authenticate(scope: string | string[], acceptAllScope?: string): ExpressMiddleware {
         let scopes: string[] = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
             let token = this.options.getToken(req);

@@ -129,8 +129,6 @@ export type ServerOptions = {
     minStateLength?: number;
     /**
      * Override client credentials location.
-     * If the app does not send client_secret (e.x. native mobile app or spa)
-     * then set client_secret as empty string ("");
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
      * @return the client_id and client_secret.
@@ -188,6 +186,7 @@ export type ServerOptions = {
     /**
      * A function that asks if a scope is valid. Not if permitted, this will be handled by the user.
      * This function will make multiple calls if more than one scopes where passed during authorization.
+     * If no scopes where send with the request then this function will be called once with an empty scope.
      * @param scope
      * @param grantType The grant type where the function was called.
      */
@@ -202,9 +201,26 @@ export type ServerOptions = {
      * Validates that the client in question is registered.
      * If the app does not send client_secret (e.x. native mobile app or spa)
      * then it is up to ou to verify if the client will be accepted.
+     * For example:
+     *              async (client_id, client_secret) => {
+     *                  let cl = await db.find(client_id)
+     *                  if(!cl) return false;
+     *
+     *                  // The checks for redirect_uri was asked in the previous step so there is no need to check again.
+     *                  return cl.isSinglePageApplication || cl.isNativeMobile;
+     *              }
      * @param client_id The client's id.
      * @param client_secret The client's secret.
      * @return True if validation succeeds, false otherwise.
      */
-    validateClient: (client_id: string, client_secret: string) => Promise<boolean>;
+    validateClient: (client_id?: string | null, client_secret?: string | null) => Promise<boolean>;
+    /**
+     * Validates user's credentials.
+     * This will be used in the Resource Owner Credentials flow and nowhere else.
+     * Do not include sensitive data because the result will be stored to the payload.
+     * @param username
+     * @param password
+     * @return The user's identification or null if validation failed.
+     */
+    validateUser: (username?: string | null, password?: string | null) => Promise<object | null>;
 };

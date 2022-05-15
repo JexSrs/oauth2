@@ -2,6 +2,7 @@ import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
 import {ARTokensResponse, ErrorRequest, RedirectErrorRequest} from "../components/types";
 import {GrantTypes} from "../components/GrantTypes";
+import * as crypto from "crypto";
 
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
@@ -102,8 +103,30 @@ export function errorRedirect(res: any, err: RedirectErrorRequest, redirectUri: 
     }));
 }
 
-export function encodeBase64URL(str: string): string {
+function encodeBase64URL(str: string): string {
     return str.replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
+}
+
+export function hash(challenge: 'plain' | 'S256', str: string): string {
+    let code = str;
+    if(challenge === 'S256') {
+        code = crypto.createHash('sha256').update(code).digest('base64');
+        code = encodeBase64URL(code);
+    }
+    return code;
+}
+
+export function getGrantType(str: string): GrantTypes | null {
+    switch (str) {
+        case 'code':
+        case 'authorization_code':
+            return GrantTypes.AUTHORIZATION_CODE;
+        case 'token': return GrantTypes.IMPLICIT;
+        case 'password': return GrantTypes.RESOURCE_OWNER_CREDENTIALS;
+        case 'client_credentials': return GrantTypes.CLIENT_CREDENTIALS;
+        case 'refresh_token': return GrantTypes.REFRESH_TOKEN;
+        default: return null;
+    }
 }
