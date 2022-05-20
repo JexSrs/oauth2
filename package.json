@@ -1,32 +1,32 @@
 {
-  "name": "@project-christopher/oauth2",
-  "version": "1.0.0",
-  "description": "oauth2",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "directories": {
-    "lib": "lib",
-    "test": "test"
-  },
-  "scripts": {
-    "build": "rm -rf dist && tsc",
-    "test": "tsc && mocha --exit"
-  },
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Project-Christopher/oauth2.git"
-  },
-  "dependencies": {
-    "jsonwebtoken": "^8.5.1"
-  },
-  "devDependencies": {
-    "@types/node": "^17.0.33",
-    "@types/jsonwebtoken": "^8.5.8",
-    "@types/nanoid": "^3.0.0",
-    "chai": "^4.3.6",
-    "express": "4.18.1",
-    "mocha": "^10.0.0",
-    "typescript": "^4.6.4"
-  }
+    "name": "@project-christopher/oauth2",
+    "version": "1.0.0",
+    "description": "oauth2",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "directories": {
+        "lib": "lib",
+        "test": "test"
+    },
+    "scripts": {
+        "build": "rm -rf dist && tsc",
+        "test": "tsc && mocha --exit"
+    },
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Project-Christopher/oauth2.git"
+    },
+    "dependencies": {
+        "jsonwebtoken": "^8.5.1"
+    },
+    "devDependencies": {
+        "@types/jsonwebtoken": "^8.5.8",
+        "@types/nanoid": "^3.0.0",
+        "@types/node": "^17.0.33",
+        "chai": "^4.3.6",
+        "express": "4.18.1",
+        "mocha": "^10.0.0",
+        "typescript": "^4.6.4"
+    }
 }

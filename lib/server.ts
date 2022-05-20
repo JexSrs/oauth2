@@ -9,6 +9,7 @@ import {
     getGrantType,
     mergeOptions,
     parseScopes,
+    validURI,
 } from "./modules/utils";
 import {generateARTokens, signToken, verifyToken} from './modules/tokenUtils'
 import {memory} from "./modules/memory";
@@ -16,8 +17,12 @@ import {GrantTypes} from "./components/GrantTypes";
 import {TokenErrorRequest} from "./components/tokenErrorRequest";
 import {AuthorizeErrorRequest} from "./components/authorizeErrorRequest";
 
-
 export class Server {
+
+    // TODO - Since the authorization server may require clients to specify if they are public or confidential,
+    //  it can reject authorization requests that aren’t allowed. For example, if the client specified they are
+    //  a confidential client, the server can reject a request that uses the token grant type. When rejecting for
+    //  this reason, use the error code unauthorized_client.
 
     // TODO - add event listeners, maybe using .on(event, listener);
     //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
@@ -48,33 +53,25 @@ export class Server {
         if (typeof opts.allowNonHTTPSRedirectURIs === 'undefined')
             opts.allowNonHTTPSRedirectURIs = false;
 
-        if (typeof opts.usePKCE === 'undefined')
-            opts.usePKCE = true;
+        if (typeof opts.usePKCE === 'undefined') opts.usePKCE = true;
 
         if (typeof opts.allowCodeChallengeMethodPlain === 'undefined')
             opts.allowCodeChallengeMethodPlain = false;
 
-        if (!opts.minStateLength)
-            opts.minStateLength = 8;
+        if (!opts.getClientCredentials) opts.getClientCredentials = (req: any) => {
+            let authHeader = req.headers['authorization'];
+            let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
 
-        if (!opts.getClientCredentials)
-            opts.getClientCredentials = (req: any) => {
-                let authHeader = req.headers['authorization'];
-                let decoded = authHeader
-                    && Buffer.from(authHeader, 'base64').toString()
-                    || '';
-
-                let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
-                return {client_id, client_secret};
-            };
+            let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
+            return {client_id, client_secret};
+        };
 
         if (typeof opts.accessTokenLifetime !== 'undefined') {
             if (opts.accessTokenLifetime <= 0 || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime)
                 throw new Error('accessTokenLifetime is not positive integer.')
         } else opts.accessTokenLifetime = 86400;
 
-        if (typeof opts.issueRefreshToken === 'undefined')
-            opts.issueRefreshToken = opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN);
+        if (typeof opts.issueRefreshToken === 'undefined') opts.issueRefreshToken = opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN);
 
         if (typeof opts.refreshTokenLifetime === 'undefined')
             opts.refreshTokenLifetime = 864000;
@@ -160,9 +157,7 @@ export class Server {
 
         // Database verification
         let dbCode = await opts.tokenHandler.getAuthorizationCode({
-            clientId: client_id,
-            authorizationCode: code,
-            user: authCodePayload.user,
+            clientId: client_id, authorizationCode: code, user: authCodePayload.user,
         });
 
         if (!dbCode || dbCode.authorizationCode !== code)
@@ -179,16 +174,12 @@ export class Server {
 
         // Database delete
         await opts.tokenHandler.deleteAuthorizationCode({
-            clientId: client_id,
-            authorizationCode: code,
-            user: authCodePayload.user,
+            clientId: client_id, authorizationCode: code, user: authCodePayload.user,
         });
 
         // Generate access & refresh tokens
         let response = await generateARTokens({
-            client_id,
-            user: authCodePayload.user,
-            scopes: authCodePayload.scopes
+            client_id, user: authCodePayload.user, scopes: authCodePayload.scopes
         }, req, opts);
         res.status(200).header('Cache-Control', 'no-store').json(response);
     }
@@ -245,9 +236,7 @@ export class Server {
             return errorBody(res, TokenErrorRequest.UNAUTHORIZED_CLIENT, 'Client authentication failed');
 
         let dbToken = await opts.tokenHandler.getRefreshToken({
-            refreshToken: refresh_token,
-            clientId: client_id,
-            user: refreshTokenPayload.user,
+            refreshToken: refresh_token, clientId: client_id, user: refreshTokenPayload.user,
         });
 
         if (!dbToken || dbToken !== refresh_token)
@@ -255,9 +244,7 @@ export class Server {
 
         // Remove old tokens from database
         await opts.tokenHandler.deleteTokens({
-            refreshToken: refresh_token,
-            clientId: client_id,
-            user: refreshTokenPayload.user
+            refreshToken: refresh_token, clientId: client_id, user: refreshTokenPayload.user
         });
 
         let response = await generateARTokens({client_id, scopes}, req, opts);
@@ -267,7 +254,7 @@ export class Server {
     /**
      * Assign this function to the 'authorize' endpoint.
      */
-    public authorize(options: Partial<ServerOptions>): ExpressMiddleware {
+    public authorize(options?: Partial<ServerOptions>): ExpressMiddleware {
         const opts = mergeOptions(this.options, options);
         checkOptions(opts, 'authorize');
 
@@ -280,18 +267,15 @@ export class Server {
             const {client_id, redirect_uri, state, scope, response_type} = req.query;
 
             // Validate client_id and redirect_uri
-            if (!opts.allowNonHTTPSRedirectURIs && !redirect_uri.startsWith('https://'))
-                return errorBody(res, TokenErrorRequest.INVALID_REQUEST, 'Redirect URI is not https.');
+            if (!validURI(redirect_uri, opts.allowNonHTTPSRedirectURIs))
+                return errorBody(res, TokenErrorRequest.INVALID_REQUEST, 'Redirect URI is not valid URI');
+
             if (!(await opts.validateRedirectURI(client_id, redirect_uri))) // TODO - send grant type to check if client is allowed to use the specific grand type
                 return errorBody(res, TokenErrorRequest.INVALID_REQUEST, 'Client id or redirect URI are not registered');
 
-            let user: any
+            let user: any;
             if ((user = opts.getUser(req)) == null)
                 return errorRedirect(res, AuthorizeErrorRequest.ACCESS_DENIED, redirect_uri, state, 'User did not approve request')
-
-            /// Check state minimum length.
-            if (state.length < opts.minStateLength)
-                return errorRedirect(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, `state must be at least ${opts.minStateLength} characters`)
 
             let gt: GrantTypes | null = getGrantType(response_type);
             if (!gt || !opts.grantTypes.includes(gt))
@@ -306,8 +290,7 @@ export class Server {
                 Server.authorizationCode1(req, res, opts, scopes, user);
             else if (response_type === 'token')
                 Server.implicit(req, res, opts, scopes, user);
-            else
-                errorRedirect(res, AuthorizeErrorRequest.UNSUPPORTED_RESPONSE_TYPE, redirect_uri, state, 'response_type is not acceptable');
+            else errorRedirect(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'response_type is not acceptable');
 
         };
     }
@@ -315,7 +298,7 @@ export class Server {
     /**
      * Assign this function to the 'token' endpoint.
      */
-    public token(options: Partial<ServerOptions>): ExpressMiddleware {
+    public token(options?: Partial<ServerOptions>): ExpressMiddleware {
         const opts = mergeOptions(this.options, options);
         checkOptions(opts, 'token');
 
@@ -342,12 +325,12 @@ export class Server {
                 else if (grant_type === 'client_credentials')
                     Server.clientCredentials(req, res, opts, scopes);
 
-            } else if (grant_type === 'authorization_code')
+            }
+            else if (grant_type === 'authorization_code')
                 Server.authorizationCode2(req, res, opts);
             else if (grant_type === 'refresh_token')
                 Server.refreshToken(req, res, opts);
-            else
-                return errorBody(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
+            else errorBody(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
         };
     }
 
@@ -357,7 +340,7 @@ export class Server {
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *                  then the authentication will fail.
      */
-    public authenticate(options: Partial<ServerOptions>, scope?: string | string[]): ExpressMiddleware {
+    public authenticate(options?: Partial<ServerOptions>, scope?: string | string[]): ExpressMiddleware {
         const opts = mergeOptions(this.options, options);
         checkOptions(opts, 'authenticate');
 
@@ -365,36 +348,32 @@ export class Server {
         return async (req, res, next) => {
             let token = opts.getToken(req);
             if (!token) {
-                res.status(403).end('Authentication failed.')
+                res.status(403).end('Authentication failed.');
                 return;
             }
 
             let payload: any = verifyToken(token, opts.secret);
             if (!payload) {
-                res.status(403).end('Authentication failed.')
+                res.status(403).end('Authentication failed.');
                 return;
             }
 
             if (scopes && payload.scopes.some(v => !scopes.includes(v))) {
-                res.status(403).end('Authentication failed.')
+                res.status(403).end('Authentication failed.');
                 return;
             }
 
             let dbToken = await opts.tokenHandler.getAccessToken({
-                accessToken: token,
-                clientId: payload.client_id,
-                user: payload.user
+                accessToken: token, clientId: payload.client_id, user: payload.user
             });
 
             if (!dbToken || dbToken !== token) {
-                res.status(403).end('Authentication failed.')
+                res.status(403).end('Authentication failed.');
                 return;
             }
 
             opts.setPayloadLocation(req, {
-                clientId: payload.client_id,
-                user: payload.user,
-                scopes: payload.scopes,
+                clientId: payload.client_id, user: payload.user, scopes: payload.scopes,
             });
             next();
         };

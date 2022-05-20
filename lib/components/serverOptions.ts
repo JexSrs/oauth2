@@ -124,11 +124,6 @@ export type ServerOptions = {
      */
     allowCodeChallengeMethodPlain: boolean;
     /**
-     * Specify the minimum state length that the client will send during authorization.
-     * Defaults to 8 characters.
-     */
-    minStateLength: number;
-    /**
      * Override client credentials location.
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
@@ -185,7 +180,9 @@ export type ServerOptions = {
      * @param scope
      */
     isScopeValid: (scope: string) => (Promise<boolean> | boolean);
-    /** Validate that the redirect uri that was passed during authorization is registered matches the client's redirect uris.
+    /**
+     * Validate that the redirect uri that was passed during authorization is
+     * registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
      * @return True if validation passes, false otherwise.
@@ -193,16 +190,6 @@ export type ServerOptions = {
     validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
-     * If the app does not send client_secret (e.x. native mobile app or spa)
-     * then it is up to ou to verify if the client will be accepted.
-     * For example:
-     *              async (client_id, client_secret) => {
-     *                  let cl = await db.find(client_id)
-     *                  if(!cl) return false;
-     *
-     *                  // The checks for redirect_uri was asked in the previous step so there is no need to check again.
-     *                  return cl.isSinglePageApplication || cl.isNativeMobile;
-     *              }
      * @param client_id The client's id.
      * @param client_secret The client's secret.
      * @return True if validation succeeds, false otherwise.
