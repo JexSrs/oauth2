@@ -7,6 +7,7 @@ export type THTokenSave = {
     refreshTokenExpiresAt?: number;
     clientId: string;
     user: any;
+    scopes: string[];
 };
 
 type THAccessTokenAsk = {
@@ -88,14 +89,14 @@ export type ServerOptions = {
      * Which grant types will be available for the app.
      * Defaults to [GrantTypes.AUTHORIZATION_CODE, GrantTypes.REFRESH_TOKEN].
      */
-    grantTypes?: GrantTypes[];
+    grantTypes: GrantTypes[];
     /**
      * Override token location during authentication.
      * Defaults to req.headers['authorization'].
      * @param req The request instance.
      * @return string The token that the client passed.
      */
-    getToken?: (req: any) => string;
+    getToken: (req: any) => string;
     /**
      * Override payload location (when the verification is complete where to save the verified payload,
      * so it can be accessed later by the app). The payload will be an object that contains {client_id, user, scopes}.
@@ -103,37 +104,37 @@ export type ServerOptions = {
      * @param req The request instance.
      * @param payload The payload that will be saved at the request instance.
      */
-    payloadLocation?: (req: any, payload: object) => void;
+    setPayloadLocation: (req: any, payload: object) => void;
     /**
      * If the redirect_uri that was sent with the requests does start  with https://
      * then the request will be aborted. In case you are using custom protocols, like redirect
      * to an android app (my-app://path/to) you can disable this and do the check manually from your app.
      * Defaults to false.
      */
-    allowNonHTTPSRedirectURIs?: boolean;
+    allowNonHTTPSRedirectURIs: boolean;
     /**
      * Whether to use PKCE during authorization code flow.
      * Defaults tp true.
      */
-    usePKCE?: boolean;
+    usePKCE: boolean;
     /**
      * If you are using PKCE, whether code challenge method plain is allowed
      * or S256 is mandatory.
      * Defaults to false.
      */
-    allowCodeChallengeMethodPlain?: boolean;
+    allowCodeChallengeMethodPlain: boolean;
     /**
      * Specify the minimum state length that the client will send during authorization.
      * Defaults to 8 characters.
      */
-    minStateLength?: number;
+    minStateLength: number;
     /**
      * Override client credentials location.
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
      * @return the client_id and client_secret.
      */
-    getClientCredentials?: (req: any) => { client_id?: string | null; client_secret?: string | null; };
+    getClientCredentials: (req: any) => { client_id?: string | null; client_secret?: string | null; };
     /**
      * The token secret that will be used to sign the tokens using JSONWebToken (JWT).
      */
@@ -143,54 +144,47 @@ export type ServerOptions = {
      * If set to null, then the token will never expire.
      * Defaults to 86400 seconds (1 day).
      */
-    accessTokenLifetime?: number | null;
+    accessTokenLifetime: number | null;
     /**
      * Whether a refresh token will be issued alongside the access token.
      * Defaults to if 'refresh-token' grant type is allowed.
      */
-    issueRefreshToken?: boolean;
+    issueRefreshToken: boolean;
     /**
      * The refresh token's lifetime in seconds.
      * If set to null, then the token will never expire.
      * Defaults to 864000 seconds (10 days).
      */
-    refreshTokenLifetime?: number | null;
+    refreshTokenLifetime: number | null;
     /**
      * The authorization code's lifetime in seconds.
      * Defaults to 300 seconds (5 minutes).
      */
-    authorizationCodeLifetime?: number;
+    authorizationCodeLifetime: number;
     /**
      * Override the database's functions needed for storing and accessing the tokens.
      * Defaults to memory.
      */
-    tokenHandler?: TokenHandlerFunctions;
-    /**
-     * Returns true if user approved the request false otherwise.
-     * Defaults to req.userApproved.
-     * @param req The request instance.
-     */
-    getUserApproved: (req: any) => boolean;
+    tokenHandler: Partial<TokenHandlerFunctions>;
     /**
      * Get an identification of the user that was authenticated in this request.
      * This will be included in payloads so do not add sensitive data.
      * @param req The request instance.
      * @return The user's identification.
      */
-    getUser: (req: any) => string | object | number | (string | object | number | boolean)[];
+    getUser: (req: any) => string | object | number | (string | object | number | boolean)[] | null;
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults to ' ' (one space character).
      */
-    scopeDelimiter?: string;
+    scopeDelimiter: string;
     /**
      * A function that asks if a scope is valid. Not if permitted, this will be handled by the user.
      * This function will make multiple calls if more than one scopes where passed during authorization.
      * If no scopes where send with the request then this function will be called once with an empty scope.
      * @param scope
-     * @param grantType The grant type where the function was called.
      */
-    isScopeValid: (scope: string, grantType: GrantTypes) => (Promise<boolean> | boolean);
+    isScopeValid: (scope: string) => (Promise<boolean> | boolean);
     /** Validate that the redirect uri that was passed during authorization is registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
