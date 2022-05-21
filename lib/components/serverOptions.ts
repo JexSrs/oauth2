@@ -43,7 +43,7 @@ export type TokenHandlerFunctions = {
     /**
      * The function that will save the access and refresh tokens to the database.
      * @param data
-     * @return boolean True on succeed, false otherwise.
+     * @return {boolean} True on succeed, false otherwise.
      */
     saveTokens: (data: THTokenSave) => Promise<boolean>;
     /**
@@ -61,13 +61,13 @@ export type TokenHandlerFunctions = {
     /**
      * The function that will remove the access & refresh tokens from the database.
      * @param data
-     * @return boolean True on succeed, false otherwise.
+     * @return {boolean} True on succeed, false otherwise.
      */
     deleteTokens: (data: THRefreshTokenAsk) => Promise<boolean>;
     /**
      * The function that will save the authorization code to the database.
      * @param data
-     * @return boolean True on succeed, false otherwise.
+     * @return {boolean} True on succeed, false otherwise.
      */
     saveAuthorizationCode: (data: THAuthorizationCodeSave) => Promise<boolean>;
     /**
@@ -79,7 +79,7 @@ export type TokenHandlerFunctions = {
     /**
      * The function that will remove the authorization code from the database.
      * @param data
-     * @return boolean True on succeed, false otherwise.
+     * @return {boolean} True on succeed, false otherwise.
      */
     deleteAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean>;
 };
@@ -87,6 +87,7 @@ export type TokenHandlerFunctions = {
 export type ServerOptions = {
     /**
      * Which grant types will be available for the app.
+     * If GrantTypes.REFRESH_TOKEN is included then a refresh token will be generated with the access tokens.
      * Defaults to [GrantTypes.AUTHORIZATION_CODE, GrantTypes.REFRESH_TOKEN].
      */
     grantTypes: GrantTypes[];
@@ -106,12 +107,11 @@ export type ServerOptions = {
      */
     setPayloadLocation: (req: any, payload: object) => void;
     /**
-     * If the redirect_uri that was sent with the requests does start  with https://
-     * then the request will be aborted. In case you are using custom protocols, like redirect
-     * to an android app (my-app://path/to) you can disable this and do the check manually from your app.
-     * Defaults to false.
+     * If the redirect_uri that was sent with the requests start with http://
+     * then the request will be aborted.
+     * Defaults to true.
      */
-    allowNonHTTPSRedirectURIs: boolean;
+    rejectHTTPRedirectURIs: boolean;
     /**
      * Whether to use PKCE during authorization code flow.
      * Defaults tp true.
@@ -125,6 +125,7 @@ export type ServerOptions = {
     allowCodeChallengeMethodPlain: boolean;
     /**
      * Override client credentials location.
+     * If one of the credentials is not found return undefined, null empty or string.
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
      * @return the client_id and client_secret.
@@ -141,11 +142,6 @@ export type ServerOptions = {
      */
     accessTokenLifetime: number | null;
     /**
-     * Whether a refresh token will be issued alongside the access token.
-     * Defaults to if 'refresh-token' grant type is allowed.
-     */
-    issueRefreshToken: boolean;
-    /**
      * The refresh token's lifetime in seconds.
      * If set to null, then the token will never expire.
      * Defaults to 864000 seconds (10 days).
@@ -153,7 +149,7 @@ export type ServerOptions = {
     refreshTokenLifetime: number | null;
     /**
      * The authorization code's lifetime in seconds.
-     * Defaults to 300 seconds (5 minutes).
+     * Defaults to 60 seconds (1 minute).
      */
     authorizationCodeLifetime: number;
     /**
@@ -174,12 +170,12 @@ export type ServerOptions = {
      */
     scopeDelimiter: string;
     /**
-     * A function that asks if a scope is valid. Not if permitted, this will be handled by the user.
-     * This function will make multiple calls if more than one scopes where passed during authorization.
-     * If no scopes where send with the request then this function will be called once with an empty scope.
-     * @param scope
+     * A function that asks if the passed scopes are valid. Not if permitted, this will be handled by the user.
+     * If no scopes where send with the request then this function will be called once with an empty array.
+     * @param scopes
+     * @return true if scope is valid, false otherwise
      */
-    isScopeValid: (scope: string) => (Promise<boolean> | boolean);
+    isScopesValid: (scopes: string[]) => (Promise<boolean> | boolean);
     /**
      * Validate that the redirect uri that was passed during authorization is
      * registered matches the client's redirect uris.
@@ -204,4 +200,17 @@ export type ServerOptions = {
      * @return The user's identification or null if validation failed.
      */
     validateUser: (username?: string | null, password?: string | null) => Promise<object | null>;
+    /**
+     * If this function return true, it will abort the authorization requests
+     * with the justification of temporary unavailable.
+     * Can also be an asynchronous function in case you want to ask a remote service.
+     * Defaults to false.
+     * @return true to abort, false otherwise.
+     */
+    isTemporaryUnavailable: boolean | ((req: any) => Promise<boolean>);
+    /**
+     * The issuer parameter while signing the tokens.
+     * Defaults to empty string.
+     */
+    issuer: string;
 };

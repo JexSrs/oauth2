@@ -1,23 +1,31 @@
 import * as jwt from "jsonwebtoken";
 import {ServerOptions} from "../components/serverOptions";
-import {ARTokensResponse} from "../components/types";
+import {ARTokensResponse, OAuth2Error} from "../components/types";
+import {AuthorizeErrorRequest} from "../components/authorizeErrorRequest";
+import {GrantTypes} from "../components/GrantTypes";
 
-export function signToken(payload: object, secret: string, expiresIn?: number): string {
+export function signToken(payload: object, secret: string, issuer: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
         algorithm: 'HS512',
-        expiresIn
+        expiresIn,
+        issuer,
+        audience: 'api://default'
     });
 }
 
-export function verifyToken(token: string, secret: string): object | null {
+export function verifyToken(token: string, secret: string, issuer: string): object | null {
     try {
-        return jwt.verify(token, secret) as any;
+        return jwt.verify(token, secret, {
+            algorithms: ['HS512'],
+            issuer,
+            complete: true,
+        }).payload as any;
     } catch (e) {
         return null;
     }
 }
 
-export async function generateARTokens(payload: object, req: any, opts: Partial<ServerOptions>, generateRefreshToken: boolean = true): Promise<ARTokensResponse> {
+export async function generateARTokens(payload: object, req: any, opts: Partial<ServerOptions>, generateRefreshToken: boolean = true): Promise<ARTokensResponse | OAuth2Error> {
     let accessTokenPayload = {
         ...payload,
         type: 'accessToken'
@@ -27,13 +35,13 @@ export async function generateARTokens(payload: object, req: any, opts: Partial<
         type: 'refreshToken'
     };
 
-    let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.accessTokenLifetime ?? undefined);
+    let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.issuer, opts.accessTokenLifetime ?? undefined);
     let refreshToken: string | undefined;
-    if (opts.issueRefreshToken && generateRefreshToken)
-        refreshToken = signToken(refreshTokenPayload, opts.secret, opts.refreshTokenLifetime ?? undefined);
+    if (opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN) && generateRefreshToken)
+        refreshToken = signToken(refreshTokenPayload, opts.secret, opts.issuer, opts.refreshTokenLifetime ?? undefined);
 
     // Database save
-    await opts.tokenHandler.saveTokens({
+    let dbRes = await opts.tokenHandler.saveTokens({
         accessToken,
         accessTokenExpiresAt: Math.trunc((Date.now() + opts.accessTokenLifetime * 1000) / 1000),
         refreshToken,
@@ -42,11 +50,16 @@ export async function generateARTokens(payload: object, req: any, opts: Partial<
         user: (payload as any).user,
         scopes: (payload as any).scopes,
     });
+    if(!dbRes) return {
+        error: AuthorizeErrorRequest.SERVER_ERROR,
+        error_description: 'Encountered an unexpected database error'
+    };
 
     return {
         access_token: accessToken,
         token_type: 'Bearer',
         expires_in: opts.accessTokenLifetime,
         refresh_token: refreshToken,
+        scope: (payload as any).scopes.join(opts.scopeDelimiter)
     };
 }

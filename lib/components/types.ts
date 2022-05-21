@@ -5,4 +5,11 @@ export type ARTokensResponse = {
     token_type: string;
     expires_in: number;
     refresh_token?: string;
+    scope: string;
 };
+
+export type OAuth2Error = {
+    error: string;
+    error_description: string;
+    error_uri?: string;
+}
