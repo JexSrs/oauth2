@@ -1,5 +1,5 @@
 import * as jwt from "jsonwebtoken";
-import {ServerOptions} from "../components/serverOptions";
+import {AuthorizationServerOptions} from "../components/authorizationServerOptions";
 import {ARTokensResponse, OAuth2Error} from "../components/types";
 import {AuthorizeErrorRequest} from "../components/authorizeErrorRequest";
 import {GrantTypes} from "../components/GrantTypes";
@@ -18,14 +18,13 @@ export function verifyToken(token: string, secret: string, issuer: string): obje
         return jwt.verify(token, secret, {
             algorithms: ['HS512'],
             issuer,
-            complete: true,
-        }).payload as any;
+        }) as any;
     } catch (e) {
         return null;
     }
 }
 
-export async function generateARTokens(payload: object, req: any, opts: Partial<ServerOptions>, generateRefreshToken: boolean = true): Promise<ARTokensResponse | OAuth2Error> {
+export async function generateARTokens(payload: object, req: any, opts: Partial<AuthorizationServerOptions>, generateRefreshToken: boolean = true): Promise<ARTokensResponse | OAuth2Error> {
     let accessTokenPayload = {
         ...payload,
         type: 'accessToken'
@@ -37,7 +36,11 @@ export async function generateARTokens(payload: object, req: any, opts: Partial<
 
     let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.issuer, opts.accessTokenLifetime ?? undefined);
     let refreshToken: string | undefined;
-    if (opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN) && generateRefreshToken)
+
+    // Allow when asked && grant type is available && accessToken does not expire
+    if (generateRefreshToken
+        && opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN)
+        && opts.accessTokenLifetime != null)
         refreshToken = signToken(refreshTokenPayload, opts.secret, opts.issuer, opts.refreshTokenLifetime ?? undefined);
 
     // Database save

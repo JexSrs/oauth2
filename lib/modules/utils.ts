@@ -1,15 +1,14 @@
-import {ServerOptions} from "../components/serverOptions";
+import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
 import {GrantTypes} from "../components/GrantTypes";
 import * as crypto from "crypto";
-import {TokenErrorRequest} from "../components/tokenErrorRequest";
-import {AuthorizeErrorRequest} from "../components/authorizeErrorRequest";
-import {OAuth2Exception} from "../components/OAuth2Exception";
-import {URL} from "url";
-import {AuthenticateErrorRequest} from "../components/authenticateErrorRequest";
+import {TokenErrorRequest} from "../components/errors/tokenErrorRequest";
+import {AuthorizeErrorRequest} from "../components/errors/authorizeErrorRequest";
+import {OAuth2Exception} from "../components/exceptions/OAuth2Exception";
+import {AuthenticateErrorRequest} from "../components/errors/authenticateErrorRequest";
 
-export async function parseScopes(scope: string | undefined | null, options: Partial<ServerOptions>): Promise<string[] | null> {
+export async function parseScopes(scope: string | undefined | null, options: Partial<AuthorizationServerOptions>): Promise<string[] | null> {
     let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
-    if(!(await options.isScopesValid(scopes)))
+    if (!(await options.isScopesValid(scopes)))
         return null;
     return scopes;
 }
@@ -22,7 +21,7 @@ export function buildRedirectURI(redirectURI: string, params: object): string {
     return r.substring(0, r.length - 1);
 }
 
-export function errorBody(res: any, err: TokenErrorRequest, description: string) {
+export function tokenError(res: any, err: TokenErrorRequest, description: string): void {
     let status = 400;
     if (err === TokenErrorRequest.INVALID_CLIENT)
         status = 401;
@@ -37,7 +36,7 @@ export function errorBody(res: any, err: TokenErrorRequest, description: string)
         });
 }
 
-export function authenticateErrorBody(res: any, err: AuthenticateErrorRequest, description: string) {
+export function authenticateError(res: any, err: AuthenticateErrorRequest, description: string): void {
     let status = 0;
     switch (err) {
         case AuthenticateErrorRequest.INVALID_REQUEST:
@@ -61,7 +60,7 @@ export function authenticateErrorBody(res: any, err: AuthenticateErrorRequest, d
         });
 }
 
-export function errorRedirect(res: any, err: AuthorizeErrorRequest, redirectUri: string, state: string, description: string) {
+export function authorizeError(res: any, err: AuthorizeErrorRequest, redirectUri: string, state: string, description: string): void {
     description = description.endsWith('.') ? description : `${description}.`;
     res.header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
         .redirect(buildRedirectURI(redirectUri, {
@@ -72,17 +71,16 @@ export function errorRedirect(res: any, err: AuthorizeErrorRequest, redirectUri:
         }));
 }
 
-function encodeBase64URL(str: string): string {
-    return str.replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-}
-
 export function codeChallengeHash(challenge: 'plain' | 'S256', str: string): string {
     let code = str;
     if (challenge === 'S256') {
+        // Hash
         code = crypto.createHash('sha256').update(code).digest('base64');
-        code = encodeBase64URL(code);
+
+        // Encode base64 url
+        code = code.replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
     }
     return code;
 }
@@ -105,27 +103,18 @@ export function getGrantType(str: string): GrantTypes | null {
     }
 }
 
-export function mergeOptions(global?: Partial<ServerOptions>, func?: Partial<ServerOptions>): Partial<ServerOptions> {
-    if (!func) return global;
-    if (!global) return func;
-    return {...global, ...func};
-}
-
-export function validURI(uri: string) {
-    try {
-        new URL(uri);
-        return true;
-    } catch (err) {
-        return false;
-    }
-}
-
 export function isEmbeddedWebView(req: any): boolean {
     // TODO - embedded web view
     return false;
 }
 
-export function checkOptions(opts: Partial<ServerOptions>, type: 'authorize' | 'token' | 'authenticate') {
+export function mergeOptions(global?: Partial<AuthorizationServerOptions>, func?: Partial<AuthorizationServerOptions>): Partial<AuthorizationServerOptions> {
+    if (!func) return global;
+    if (!global) return func;
+    return {...global, ...func};
+}
+
+export function checkOptions(opts: Partial<AuthorizationServerOptions>, type: 'authorize' | 'token' | 'authenticate' | 'introspection') {
     if (!Array.isArray(opts.grantTypes))
         throw new OAuth2Exception('grantTypes must be an array');
 
@@ -143,6 +132,11 @@ export function checkOptions(opts: Partial<ServerOptions>, type: 'authorize' | '
 
     if (!opts.tokenHandler)
         throw new OAuth2Exception('tokenHandler must be initialized');
+
+    if (type === 'introspection') {
+        if (typeof opts.tokenHandler.getAccessToken !== 'function')
+            throw new OAuth2Exception('tokenHandler.getAccessToken must be a function');
+    }
 
     if (type === 'authenticate') {
         if (typeof opts.getToken !== 'function')
@@ -209,17 +203,17 @@ export function checkOptions(opts: Partial<ServerOptions>, type: 'authorize' | '
     }
 
     if (type === 'token' || (type === 'authorize' && opts.grantTypes.includes(GrantTypes.IMPLICIT))) {
-        if (typeof opts.accessTokenLifetime !== 'number'
+        if (opts.accessTokenLifetime != null && (typeof opts.accessTokenLifetime !== 'number'
             || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime
-            || opts.accessTokenLifetime <= 0)
+            || opts.accessTokenLifetime <= 0))
             throw new OAuth2Exception('accessTokenLifetime must be a positive integer');
 
         // If type is token and the only grantType is CLIENT_CREDENTIALS then check for refresh token settings
         if (type === 'token' && (opts.grantTypes.length !== 1 || !opts.grantTypes.includes(GrantTypes.CLIENT_CREDENTIALS))) {
             if (opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN)) {
-                if (typeof opts.refreshTokenLifetime !== 'number'
+                if (opts.refreshTokenLifetime != null && (typeof opts.refreshTokenLifetime !== 'number'
                     || Math.trunc(opts.refreshTokenLifetime) !== opts.refreshTokenLifetime
-                    || opts.refreshTokenLifetime <= 0)
+                    || opts.refreshTokenLifetime <= 0))
                     throw new OAuth2Exception('refreshTokenLifetime must be a positive integer');
             }
         }

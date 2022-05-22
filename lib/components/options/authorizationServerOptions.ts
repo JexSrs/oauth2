@@ -1,4 +1,4 @@
-import {GrantTypes} from "./GrantTypes";
+import {GrantTypes} from "../GrantTypes";
 
 export type THTokenSave = {
     accessToken: string;
@@ -49,25 +49,25 @@ export type TokenHandlerFunctions = {
     /**
      * The function that will load the accessToken from database.
      * @param data
-     * @return {string|null} The access token if it exists or null otherwise.
+     * @return {string|null} The access token if it exists.
      */
-    getAccessToken: (data: THAccessTokenAsk) => Promise<string | null>;
+    getAccessToken: (data: THAccessTokenAsk) => Promise<string | null | undefined> | string | null | undefined;
     /**
      * The function that will load th refreshToken from database.
      * @param data
-     * @return {string|null} The refresh token if it exists or null otherwise.
+     * @return {string|null} The refresh token if it exists.
      */
-    getRefreshToken: (data: THRefreshTokenAsk) => Promise<string | null>;
+    getRefreshToken: (data: THRefreshTokenAsk) => Promise<string | null | undefined> | string | null | undefined;
     /**
      * The function that will remove the access & refresh tokens from the database.
      * @param data
-     * @return {boolean} True on succeed, false otherwise.
+     * @return {boolean} true on succeed, false otherwise.
      */
     deleteTokens: (data: THRefreshTokenAsk) => Promise<boolean>;
     /**
      * The function that will save the authorization code to the database.
      * @param data
-     * @return {boolean} True on succeed, false otherwise.
+     * @return {boolean} true on succeed, false otherwise.
      */
     saveAuthorizationCode: (data: THAuthorizationCodeSave) => Promise<boolean>;
     /**
@@ -79,12 +79,12 @@ export type TokenHandlerFunctions = {
     /**
      * The function that will remove the authorization code from the database.
      * @param data
-     * @return {boolean} True on succeed, false otherwise.
+     * @return {boolean} true on succeed, false otherwise.
      */
     deleteAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean>;
 };
 
-export type ServerOptions = {
+export type AuthorizationServerOptions = {
     /**
      * Which grant types will be available for the app.
      * If GrantTypes.REFRESH_TOKEN is included then a refresh token will be generated with the access tokens.
@@ -95,7 +95,7 @@ export type ServerOptions = {
      * Override token location during authentication.
      * Defaults to req.headers['authorization'].
      * @param req The request instance.
-     * @return string The token that the client passed.
+     * @return {string} The token that the client passed.
      */
     getToken: (req: any) => string;
     /**
@@ -122,7 +122,7 @@ export type ServerOptions = {
      * If one of the credentials is not found return undefined, null empty or string.
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req
-     * @return the client_id and client_secret.
+     * @return {object} the client_id and client_secret.
      */
     getClientCredentials: (req: any) => { client_id?: string | null; client_secret?: string | null; };
     /**
@@ -131,13 +131,14 @@ export type ServerOptions = {
     secret: string;
     /**
      * The access token's lifetime in seconds.
-     * If set to null, then the token will never expire.
+     * If set to null, then the token will never expire and no refresh token will be generated.
      * Defaults to 86400 seconds (1 day).
      */
     accessTokenLifetime: number | null;
     /**
      * The refresh token's lifetime in seconds.
-     * If set to null, then the token will never expire.
+     * If set to null, then the token will never expire until a refresh happen
+     * or is manually removed from the database.
      * Defaults to 864000 seconds (10 days).
      */
     refreshTokenLifetime: number | null;
@@ -155,7 +156,7 @@ export type ServerOptions = {
      * Get an identification of the user that was authenticated in this request.
      * This will be included in payloads so do not add sensitive data.
      * @param req The request instance.
-     * @return The user's identification.
+     * @return {any} The user's identification.
      */
     getUser: (req: any) => string | object | number | (string | object | number | boolean)[] | null;
     /**
@@ -167,7 +168,7 @@ export type ServerOptions = {
      * A function that asks if the passed scopes are valid. Not if permitted, this will be handled by the user.
      * If no scopes where send with the request then this function will be called once with an empty array.
      * @param scopes
-     * @return true if scope is valid, false otherwise
+     * @return {boolean} true if scope is valid, false otherwise
      */
     isScopesValid: (scopes: string[]) => (Promise<boolean> | boolean);
     /**
@@ -175,14 +176,14 @@ export type ServerOptions = {
      * registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
-     * @return True if validation passes, false otherwise.
+     * @return {boolean} true if validation passes, false otherwise.
      */
     validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
      * Validates that the client in question is registered.
      * @param client_id The client's id.
      * @param client_secret The client's secret.
-     * @return True if validation succeeds, false otherwise.
+     * @return {boolean} true if validation succeeds, false otherwise.
      */
     validateClient: (client_id?: string | null, client_secret?: string | null) => Promise<boolean>;
     /**
@@ -191,7 +192,7 @@ export type ServerOptions = {
      * Do not include sensitive data because the result will be stored to the payload.
      * @param username
      * @param password
-     * @return The user's identification or null if validation failed.
+     * @return {object|null} The user's identification or null if validation failed.
      */
     validateUser: (username?: string | null, password?: string | null) => Promise<object | null>;
     /**
@@ -199,7 +200,7 @@ export type ServerOptions = {
      * with the justification of temporary unavailable.
      * Can also be an asynchronous function in case you want to ask a remote service.
      * Defaults to false.
-     * @return true to abort, false otherwise.
+     * @return {boolean} true to abort, false otherwise.
      */
     isTemporaryUnavailable: boolean | ((req: any) => Promise<boolean>);
     /**
