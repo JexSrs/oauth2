@@ -7,7 +7,7 @@ import {
     codeChallengeHash,
     errorBody,
     errorRedirect,
-    getGrantType,
+    getGrantType, isEmbeddedWebView,
     mergeOptions,
     parseScopes,
     validURI
@@ -30,6 +30,7 @@ export class Server {
     //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
     //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
     //      - https://www.oauth.com/oauth2-servers/making-authenticated-requests/refreshing-an-access-token/
+
     // TODO - add new implementation, maybe using .use('implementation', function)
 
     // TODO - Add a way to identify if scopes are valid with client_id & user_id (maybe pass req, that contains query and user)
@@ -37,6 +38,8 @@ export class Server {
 
     // TODO - https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 
+    // TODO - Add option to reject the request if it was made from a embedded web view (check agent header) (only for authorize function).
+    //      - Also maybe to add a custom function that will do extra checks the user wants.
 
     private readonly options: Partial<ServerOptions>;
 
@@ -54,9 +57,6 @@ export class Server {
 
         if (!opts.setPayloadLocation)
             opts.setPayloadLocation = (req, payload) => req.payload = payload;
-
-        if (typeof opts.rejectHTTPRedirectURIs === 'undefined')
-            opts.rejectHTTPRedirectURIs = true;
 
         if (typeof opts.usePKCE === 'undefined') opts.usePKCE = true;
 
@@ -97,6 +97,9 @@ export class Server {
 
         if(!opts.issuer)
             opts.issuer = '';
+
+        if(typeof opts.rejectEmbeddedWebViews === 'undefined')
+            opts.rejectEmbeddedWebViews = true;
 
         this.options = opts;
     }
@@ -291,14 +294,14 @@ export class Server {
             const {client_id, redirect_uri, state, scope, response_type} = req.query;
 
             // Validate client_id and redirect_uri
-            if (!validURI(redirect_uri, opts.rejectHTTPRedirectURIs))
-                return errorBody(res, TokenErrorRequest.INVALID_REQUEST, 'Redirect URI is not valid URI');
-
             if (!(await opts.validateRedirectURI(client_id, redirect_uri))) // TODO - send grant type to check if client is allowed to use the specific grand type
                 return errorBody(res, TokenErrorRequest.INVALID_REQUEST, 'Client id or redirect URI are not registered');
 
             if(!(typeof opts.isTemporaryUnavailable === 'boolean' ? opts.isTemporaryUnavailable : await opts.isTemporaryUnavailable(req)))
                 return errorRedirect(res, AuthorizeErrorRequest.TEMPORARY_UNAVAILABLE, redirect_uri, state, 'The authorization server is temporary unavailable.')
+
+            if(opts.rejectEmbeddedWebViews && isEmbeddedWebView(req))
+                return errorRedirect(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'The request was made from an embedded web view, which is not allowed.')
 
             let user: any;
             if ((user = opts.getUser(req)) == null)

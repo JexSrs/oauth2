@@ -107,12 +107,6 @@ export type ServerOptions = {
      */
     setPayloadLocation: (req: any, payload: object) => void;
     /**
-     * If the redirect_uri that was sent with the requests start with http://
-     * then the request will be aborted.
-     * Defaults to true.
-     */
-    rejectHTTPRedirectURIs: boolean;
-    /**
      * Whether to use PKCE during authorization code flow.
      * Defaults tp true.
      */
@@ -213,4 +207,10 @@ export type ServerOptions = {
      * Defaults to empty string.
      */
     issuer: string;
+    /**
+     * If the request was made using an embedded web view the request will be rejected.
+     * The agent header will be used to verify the browser that makes the request.
+     * Defaults to true.
+     */
+    rejectEmbeddedWebViews: boolean;
 };

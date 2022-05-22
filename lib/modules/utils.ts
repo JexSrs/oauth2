@@ -111,13 +111,18 @@ export function mergeOptions(global?: Partial<ServerOptions>, func?: Partial<Ser
     return {...global, ...func};
 }
 
-export function validURI(uri: string, rejectHTTP: boolean) {
+export function validURI(uri: string) {
     try {
-        const url = new URL(uri);
-        return rejectHTTP ? url.protocol !== 'http:' : true;
+        new URL(uri);
+        return true;
     } catch (err) {
         return false;
     }
+}
+
+export function isEmbeddedWebView(req: any): boolean {
+    // TODO - embedded web view
+    return false;
 }
 
 export function checkOptions(opts: Partial<ServerOptions>, type: 'authorize' | 'token' | 'authenticate') {
@@ -150,12 +155,12 @@ export function checkOptions(opts: Partial<ServerOptions>, type: 'authorize' | '
     }
 
     if (type === 'authorize') {
-        if (typeof opts.rejectHTTPRedirectURIs !== 'boolean')
-            throw new OAuth2Exception('rejectHTTPRedirectURIs must be type boolean');
         if (typeof opts.getUser !== 'function')
             throw new OAuth2Exception('getUser must be a function');
         if (typeof opts.validateRedirectURI !== 'function')
             throw new OAuth2Exception('validateRedirectURI must be a function');
+        if (typeof opts.rejectEmbeddedWebViews !== 'boolean')
+            throw new OAuth2Exception('rejectEmbeddedWebViews must be type boolean');
 
         if (opts.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE)) {
             if (typeof opts.authorizationCodeLifetime !== 'number'
