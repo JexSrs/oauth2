@@ -9,7 +9,6 @@ import {
     authorizeError,
     getGrantType, isEmbeddedWebView,
     mergeOptions,
-    parseScopes
 } from "./modules/utils";
 import {generateARTokens, signToken, verifyToken} from './modules/tokenUtils'
 import {memory} from "./modules/memory";
@@ -25,9 +24,7 @@ export class AuthorizationServer {
     //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
     //      - https://www.oauth.com/oauth2-servers/making-authenticated-requests/refreshing-an-access-token/
 
-    // TODO - add new implementation, maybe using .use('implementation', function)
-    //      - Maybe add like google device: https://www.oauth.com/oauth2-servers/device-flow/
-    //      - Abort grantTypes array and use .use('implementation', options) to include flows
+    // TODO - Maybe add like google device: https://www.oauth.com/oauth2-servers/device-flow/
 
     // TODO - Add a way to identify if scopes are valid with client_id & user_id (maybe pass req, that contains query and user)
     //      - This also can be checked before authorization at previous middleware by parsing and checking scopes
@@ -203,8 +200,8 @@ export class AuthorizationServer {
         // Generate access & refresh tokens
         let response = await generateARTokens({
             client_id,
-            user: authCodePayload.user,
-            scopes: authCodePayload.scopes
+            user: dbCode.user,
+            scopes: dbCode.scopes
         }, req, opts);
         res.status(200).header('Cache-Control', 'no-store').json(response);
     }
@@ -280,6 +277,10 @@ export class AuthorizationServer {
         res.status(200).header('Cache-Control', 'no-store').json(response);
     }
 
+    private static async deviceFlow(req: any, res: any, opts: Partial<AuthorizationServerOptions>): Promise<void> {
+
+    }
+
     /**
      * Assign this function to the 'authorize' endpoint.
      */
@@ -311,14 +312,14 @@ export class AuthorizationServer {
 
             let gt: GrantType | null = getGrantType(response_type);
             if (!gt || !opts.grantTypes.includes(gt))
-                return authorizeError(res, AuthorizeErrorRequest.UNSUPPORTED_RESPONSE_TYPE, redirect_uri, state, 'response_type is not acceptable');
+                return authorizeError(res, AuthorizeErrorRequest.UNSUPPORTED_RESPONSE_TYPE, redirect_uri, state, 'response_type is not supported');
 
             if(!(await opts.isGrantTypeAllowed(client_id, gt)))
                 return authorizeError(res, AuthorizeErrorRequest.UNAUTHORIZED_CLIENT, redirect_uri, state, 'This client is not allowed to use this grant type')
 
             // Validate scopes
-            let scopes: string[] | null;
-            if ((scopes = await parseScopes(scope, opts)) == null)
+            let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
+            if (!(await options.isScopesValid(scopes)))
                 return authorizeError(res, AuthorizeErrorRequest.INVALID_SCOPE, redirect_uri, state, 'One or more scopes are not acceptable');
 
             if (response_type === 'code')
@@ -351,8 +352,8 @@ export class AuthorizationServer {
 
             if (grant_type === 'password' || grant_type === 'client_credentials') {
                 // Check scopes
-                let scopes: string[] | null;
-                if ((scopes = await parseScopes(scope, opts)) == null)
+                let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
+                if (!(await options.isScopesValid(scopes)))
                     return tokenError(res, TokenErrorRequest.INVALID_SCOPE, 'One or more scopes are not acceptable');
 
                 if (grant_type === 'password')
@@ -365,6 +366,8 @@ export class AuthorizationServer {
                 AuthorizationServer.authorizationCode2(req, res, opts);
             else if (grant_type === 'refresh_token')
                 AuthorizationServer.refreshToken(req, res, opts);
+            else if (grant_type === 'device_flow')
+                AuthorizationServer.deviceFlow(req, res, opts);
             else tokenError(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
         };
     }

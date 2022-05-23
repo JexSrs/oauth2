@@ -6,13 +6,6 @@ import {AuthorizeErrorRequest} from "../components/errors/authorizeErrorRequest"
 import {OAuth2Exception} from "../components/exceptions/OAuth2Exception";
 import {AuthenticateErrorRequest} from "../components/errors/authenticateErrorRequest";
 
-export async function parseScopes(scope: string | undefined | null, options: Partial<AuthorizationServerOptions>): Promise<string[] | null> {
-    let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
-    if (!(await options.isScopesValid(scopes)))
-        return null;
-    return scopes;
-}
-
 export function buildRedirectURI(redirectURI: string, params: object): string {
     let r = `${redirectURI}?`;
     for (const key in params)
@@ -98,6 +91,8 @@ export function getGrantType(str: string): GrantType | null {
             return GrantType.CLIENT_CREDENTIALS;
         case 'refresh_token':
             return GrantType.REFRESH_TOKEN;
+        case 'device_flow':
+            return GrantType.DEVICE_FLOW;
         default:
             return null;
     }

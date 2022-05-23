@@ -3,5 +3,6 @@ export enum GrantType {
     IMPLICIT = 2,
     RESOURCE_OWNER_CREDENTIALS = 3,
     CLIENT_CREDENTIALS = 4,
-    REFRESH_TOKEN = 5
+    REFRESH_TOKEN = 5,
+    DEVICE_FLOW = 6,
 }
