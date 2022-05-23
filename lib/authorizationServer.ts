@@ -13,17 +13,12 @@ import {
 } from "./modules/utils";
 import {generateARTokens, signToken, verifyToken} from './modules/tokenUtils'
 import {memory} from "./modules/memory";
-import {GrantTypes} from "./components/GrantTypes";
+import {GrantType} from "./components/GrantType";
 import {TokenErrorRequest} from "./components/errors/tokenErrorRequest";
 import {AuthorizeErrorRequest} from "./components/errors/authorizeErrorRequest";
 import {AuthenticateErrorRequest} from "./components/errors/authenticateErrorRequest";
 
 export class AuthorizationServer {
-
-    // TODO - Since the authorization server may require clients to specify if they are public or confidential,
-    //  it can reject authorization requests that aren’t allowed. For example, if the client specified they are
-    //  a confidential client, the server can reject a request that uses the token grant type. When rejecting for
-    //  this reason, use the error code unauthorized_client.
 
     // TODO - add event listeners, maybe using .on(event, listener);
     //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
@@ -43,13 +38,15 @@ export class AuthorizationServer {
 
     // TODO - Add checks for scopes when authorizing client (client may not be allowed to access specific scopes)
 
+    // TODO - Add option to do all checks asynchronous with Promise.all([w1, w2, w3]).spread(function (r1, r2, r3) {})
+
     private readonly options: Partial<AuthorizationServerOptions>;
 
     constructor(options: Partial<AuthorizationServerOptions>) {
         let opts: Partial<AuthorizationServerOptions> = options;
 
         if (!opts.grantTypes)
-            opts.grantTypes = [GrantTypes.AUTHORIZATION_CODE, GrantTypes.REFRESH_TOKEN];
+            opts.grantTypes = [GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN];
 
         // Remove duplicate records
         opts.grantTypes = opts.grantTypes.filter((e, i) => opts.grantTypes.indexOf(e) === i);
@@ -102,6 +99,9 @@ export class AuthorizationServer {
 
         if(typeof opts.rejectEmbeddedWebViews === 'undefined')
             opts.rejectEmbeddedWebViews = true;
+
+        if(typeof opts.isGrantTypeAllowed === 'undefined')
+            opts.isGrantTypeAllowed = (client_id) => true;
 
         this.options = opts;
     }
@@ -299,7 +299,7 @@ export class AuthorizationServer {
             if (!(await opts.validateRedirectURI(client_id, redirect_uri)))
                 return tokenError(res, TokenErrorRequest.INVALID_REQUEST, 'Client id or redirect URI are not registered');
 
-            if(!(typeof opts.isTemporaryUnavailable === 'boolean' ? opts.isTemporaryUnavailable : await opts.isTemporaryUnavailable(req)))
+            if((typeof opts.isTemporaryUnavailable === 'boolean' ? opts.isTemporaryUnavailable : await opts.isTemporaryUnavailable(req)))
                 return authorizeError(res, AuthorizeErrorRequest.TEMPORARY_UNAVAILABLE, redirect_uri, state, 'The authorization server is temporary unavailable.')
 
             if(opts.rejectEmbeddedWebViews && isEmbeddedWebView(req))
@@ -309,9 +309,12 @@ export class AuthorizationServer {
             if ((user = opts.getUser(req)) == null)
                 return authorizeError(res, AuthorizeErrorRequest.ACCESS_DENIED, redirect_uri, state, 'User did not approve request')
 
-            let gt: GrantTypes | null = getGrantType(response_type);
+            let gt: GrantType | null = getGrantType(response_type);
             if (!gt || !opts.grantTypes.includes(gt))
                 return authorizeError(res, AuthorizeErrorRequest.UNSUPPORTED_RESPONSE_TYPE, redirect_uri, state, 'response_type is not acceptable');
+
+            if(!(await opts.isGrantTypeAllowed(client_id, gt)))
+                return authorizeError(res, AuthorizeErrorRequest.UNAUTHORIZED_CLIENT, redirect_uri, state, 'This client is not allowed to use this grant type')
 
             // Validate scopes
             let scopes: string[] | null;
@@ -342,7 +345,7 @@ export class AuthorizationServer {
 
             const {grant_type, scope} = req.body;
 
-            let gt: GrantTypes | null = getGrantType(grant_type);
+            let gt: GrantType | null = getGrantType(grant_type);
             if (!gt || !opts.grantTypes.includes(gt))
                 return tokenError(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
 

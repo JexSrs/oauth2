@@ -1,5 +1,5 @@
 import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
-import {GrantTypes} from "../components/GrantTypes";
+import {GrantType} from "../components/GrantType";
 import * as crypto from "crypto";
 import {TokenErrorRequest} from "../components/errors/tokenErrorRequest";
 import {AuthorizeErrorRequest} from "../components/errors/authorizeErrorRequest";
@@ -85,19 +85,19 @@ export function codeChallengeHash(challenge: 'plain' | 'S256', str: string): str
     return code;
 }
 
-export function getGrantType(str: string): GrantTypes | null {
+export function getGrantType(str: string): GrantType | null {
     switch (str) {
         case 'code':
         case 'authorization_code':
-            return GrantTypes.AUTHORIZATION_CODE;
+            return GrantType.AUTHORIZATION_CODE;
         case 'token':
-            return GrantTypes.IMPLICIT;
+            return GrantType.IMPLICIT;
         case 'password':
-            return GrantTypes.RESOURCE_OWNER_CREDENTIALS;
+            return GrantType.RESOURCE_OWNER_CREDENTIALS;
         case 'client_credentials':
-            return GrantTypes.CLIENT_CREDENTIALS;
+            return GrantType.CLIENT_CREDENTIALS;
         case 'refresh_token':
-            return GrantTypes.REFRESH_TOKEN;
+            return GrantType.REFRESH_TOKEN;
         default:
             return null;
     }
@@ -156,7 +156,7 @@ export function checkOptions(opts: Partial<AuthorizationServerOptions>, type: 'a
         if (typeof opts.rejectEmbeddedWebViews !== 'boolean')
             throw new OAuth2Exception('rejectEmbeddedWebViews must be type boolean');
 
-        if (opts.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE)) {
+        if (opts.grantTypes.includes(GrantType.AUTHORIZATION_CODE)) {
             if (typeof opts.authorizationCodeLifetime !== 'number'
                 || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime
                 || opts.authorizationCodeLifetime <= 0)
@@ -182,19 +182,19 @@ export function checkOptions(opts: Partial<AuthorizationServerOptions>, type: 'a
         if (typeof opts.validateClient !== 'function')
             throw new OAuth2Exception('validateClient must be a function');
 
-        if (opts.grantTypes.includes(GrantTypes.RESOURCE_OWNER_CREDENTIALS)) {
+        if (opts.grantTypes.includes(GrantType.RESOURCE_OWNER_CREDENTIALS)) {
             if (typeof opts.validateUser !== 'function')
                 throw new OAuth2Exception('validateUser must be a function')
         }
 
-        if (opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN)) {
+        if (opts.grantTypes.includes(GrantType.REFRESH_TOKEN)) {
             if (typeof opts.tokenHandler.getRefreshToken !== 'function')
                 throw new OAuth2Exception('tokenHandler.getRefreshToken must be a function');
             if (typeof opts.tokenHandler.deleteTokens !== 'function')
                 throw new OAuth2Exception('tokenHandler.deleteTokens must be a function');
         }
 
-        if (opts.grantTypes.includes(GrantTypes.AUTHORIZATION_CODE)) {
+        if (opts.grantTypes.includes(GrantType.AUTHORIZATION_CODE)) {
             if (typeof opts.tokenHandler.getAuthorizationCode !== 'function')
                 throw new OAuth2Exception('tokenHandler.getAuthorizationCode must be a function');
             if (typeof opts.tokenHandler.deleteAuthorizationCode !== 'function')
@@ -202,15 +202,15 @@ export function checkOptions(opts: Partial<AuthorizationServerOptions>, type: 'a
         }
     }
 
-    if (type === 'token' || (type === 'authorize' && opts.grantTypes.includes(GrantTypes.IMPLICIT))) {
+    if (type === 'token' || (type === 'authorize' && opts.grantTypes.includes(GrantType.IMPLICIT))) {
         if (opts.accessTokenLifetime != null && (typeof opts.accessTokenLifetime !== 'number'
             || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime
             || opts.accessTokenLifetime <= 0))
             throw new OAuth2Exception('accessTokenLifetime must be a positive integer');
 
         // If type is token and the only grantType is CLIENT_CREDENTIALS then check for refresh token settings
-        if (type === 'token' && (opts.grantTypes.length !== 1 || !opts.grantTypes.includes(GrantTypes.CLIENT_CREDENTIALS))) {
-            if (opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN)) {
+        if (type === 'token' && (opts.grantTypes.length !== 1 || !opts.grantTypes.includes(GrantType.CLIENT_CREDENTIALS))) {
+            if (opts.grantTypes.includes(GrantType.REFRESH_TOKEN)) {
                 if (opts.refreshTokenLifetime != null && (typeof opts.refreshTokenLifetime !== 'number'
                     || Math.trunc(opts.refreshTokenLifetime) !== opts.refreshTokenLifetime
                     || opts.refreshTokenLifetime <= 0))
@@ -220,5 +220,10 @@ export function checkOptions(opts: Partial<AuthorizationServerOptions>, type: 'a
 
         if (typeof opts.tokenHandler.saveTokens !== 'function')
             throw new OAuth2Exception('tokenHandler.saveTokens must be a function');
+    }
+
+    if(type === 'authorize' || type === 'token') {
+        if(typeof opts.isGrantTypeAllowed !== 'function')
+            throw new OAuth2Exception('isGrantTypeAllowed must be a function');
     }
 }

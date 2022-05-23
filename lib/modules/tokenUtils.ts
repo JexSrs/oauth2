@@ -1,8 +1,8 @@
 import * as jwt from "jsonwebtoken";
-import {AuthorizationServerOptions} from "../components/authorizationServerOptions";
+import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
 import {ARTokensResponse, OAuth2Error} from "../components/types";
-import {AuthorizeErrorRequest} from "../components/authorizeErrorRequest";
-import {GrantTypes} from "../components/GrantTypes";
+import {AuthorizeErrorRequest} from "../components/errors/authorizeErrorRequest";
+import {GrantType} from "../components/GrantType";
 
 export function signToken(payload: object, secret: string, issuer: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
@@ -39,7 +39,7 @@ export async function generateARTokens(payload: object, req: any, opts: Partial<
 
     // Allow when asked && grant type is available && accessToken does not expire
     if (generateRefreshToken
-        && opts.grantTypes.includes(GrantTypes.REFRESH_TOKEN)
+        && opts.grantTypes.includes(GrantType.REFRESH_TOKEN)
         && opts.accessTokenLifetime != null)
         refreshToken = signToken(refreshTokenPayload, opts.secret, opts.issuer, opts.refreshTokenLifetime ?? undefined);
 

@@ -1,4 +1,4 @@
-export enum GrantTypes {
+export enum GrantType {
     AUTHORIZATION_CODE = 1 ,
     IMPLICIT = 2,
     RESOURCE_OWNER_CREDENTIALS = 3,

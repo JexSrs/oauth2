@@ -6,4 +6,4 @@ export {AuthorizationServerOptions} from "./components/options/authorizationServ
 export {ResourceServerOptions} from "./components/options/resourceServerOptions";
 export {ClientOptions} from "./components/options/clientOptions";
 
-export {GrantTypes} from "./components/GrantTypes";
+export {GrantType} from "./components/GrantType";

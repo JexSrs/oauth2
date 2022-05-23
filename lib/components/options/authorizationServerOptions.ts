@@ -1,4 +1,4 @@
-import {GrantTypes} from "../GrantTypes";
+import {GrantType} from "../GrantType";
 
 export type THTokenSave = {
     accessToken: string;
@@ -90,7 +90,7 @@ export type AuthorizationServerOptions = {
      * If GrantTypes.REFRESH_TOKEN is included then a refresh token will be generated with the access tokens.
      * Defaults to [GrantTypes.AUTHORIZATION_CODE, GrantTypes.REFRESH_TOKEN].
      */
-    grantTypes: GrantTypes[];
+    grantTypes: GrantType[];
     /**
      * Override token location during authentication.
      * Defaults to req.headers['authorization'].
@@ -214,4 +214,12 @@ export type AuthorizationServerOptions = {
      * Defaults to true.
      */
     rejectEmbeddedWebViews: boolean;
+    /**
+     * Checks if grant type is allowed for a specific client during authorization.
+     * For example if the client is confidential you may want to reject implicit grant type.
+     * Defaults to true.
+     * @param client_id
+     * @return {boolean} true if it is allowed, false otherwise.
+     */
+    isGrantTypeAllowed: (client_id: string, grantType: GrantType) => Promise<boolean> | boolean;
 };
