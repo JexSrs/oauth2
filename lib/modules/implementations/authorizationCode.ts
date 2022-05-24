@@ -134,11 +134,8 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Generate access & refresh tokens
                 let tokens = await generateARTokens({
-                    client_id,
-                    user: dbCode.user,
-                    scopes: dbCode.scopes
-                }, serverOpts, issueRefreshToken);
-
+                    user: dbCode.user
+                }, client_id, dbCode.scopes, serverOpts, issueRefreshToken);
 
                 // Database save
                 let dbRes = await serverOpts.saveTokens({

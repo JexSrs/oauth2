@@ -14,7 +14,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             let {scope, refresh_token} = req.body;
             if (client_id.length === 0) client_id = req.body.client_id;
 
-            let refreshTokenPayload: any = verifyToken(refresh_token, opts.secret);
+            let refreshTokenPayload: any = verifyToken(refresh_token, serverOpts.secret);
             if (!refreshTokenPayload)
                 return callback(undefined, {
                     error: 'invalid_grant',
@@ -31,7 +31,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
 
             // Check scopes - No need to check with app because the new scopes must
             // be subset of the refreshTokenPayload.scopes
-            let scopes = scope.split(serverOpts.scopeDelimiter);
+            let scopes: string[] = scope.split(serverOpts.scopeDelimiter);
             if (refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
                 return callback(undefined, {
                     error: 'invalid_scope',
@@ -75,10 +75,8 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
 
             // Generate access token
             let tokens = await generateARTokens({
-                client_id,
-                scopes,
                 user: refreshTokenPayload.user
-            }, serverOpts, refreshTokenPayload.exp != null);
+            }, client_id, scopes, serverOpts, refreshTokenPayload.exp != null);
 
             // Database save
             let dbRes = await serverOpts.saveTokens({

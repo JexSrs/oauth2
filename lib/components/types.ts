@@ -1,6 +1,6 @@
 export type ExpressMiddleware = (req: any, res: any, next: any) => void;
 
-export type ARTokensResponse = {
+export type ARTokens = {
     access_token: string;
     token_type: string;
     expires_in: number;
@@ -22,15 +22,6 @@ export type THTokenSave = {
     clientId: string;
     user?: any;
     scopes: string[];
-};
-
-export type GenerateTokensOptions = {
-    secret: string;
-    issuer: string;
-    issueRefreshToken: boolean;
-    accessTokenLifetime: number | null;
-    refreshTokenLifetime: number | null;
-    saveTokens: (data: THTokenSave) => Promise<boolean>;
 };
 
 export type THAuthorizationCodeSave = {

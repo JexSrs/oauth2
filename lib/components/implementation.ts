@@ -1,4 +1,4 @@
-import {OAuth2Error} from "./types/types";
+import {OAuth2Error} from "./types";
 import {AuthorizationServerOptions} from "./options/authorizationServerOptions";
 
 export interface Implementation {
@@ -11,6 +11,13 @@ export interface Implementation {
      * The endpoint where the implementation will be accessed.
      * * authorize: The user will need to authorize the request before reaching the implementation.
      * * token: There is no user interaction, or the user has provided their credentials to the client.
+     *
+     * During authorization the following checks will be made:
+     * * validateRedirectURI
+     * * isTemporaryUnavailable
+     * * rejectEmbeddedWebViews
+     * * isGrantTypeAllowed
+     * * isScopesValid
      */
     endpoint: 'authorize' | 'token';
     /**
@@ -21,10 +28,11 @@ export interface Implementation {
     /**
      * The function that will be called when the matchType is sent by the client.
      * @param req The request instance, to get any existing or extra information that may be needed.
-     * @param scopes Only for endpoint authorize, it will validate the scopes using the function isScopesValid
-     * @param user Only for endpoint authorize, it will get the user using the function getUser
+     * @param serverOpts The authorization server's options that was passed while creating the server.
      * @param callback The callback that will provide the answer to the client. In endpoint authorize, state
      *                  will automatically be added, so there is no need to include it in your response.
+     * @param scopes Only for endpoint 'authorize', the scopes that was requested.
+     * @param user Only for endpoint 'authorize', the user's identification.
      */
     function: (
         req: any,

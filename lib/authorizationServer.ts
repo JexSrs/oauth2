@@ -307,7 +307,7 @@ export class AuthorizationServer {
 
             res.status(200).json({
                 active: true,
-                scope: payload.scopes.join(' '),
+                scope: payload.scopes.join(this.options.scopeDelimiter),
                 client_id: payload.client_id,
                 user: payload.user,
                 exp: payload.exp

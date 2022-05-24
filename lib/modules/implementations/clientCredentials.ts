@@ -29,10 +29,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
                 });
 
             // Generate access token
-            let tokens = await generateARTokens({
-                client_id,
-                scopes
-            }, serverOpts, false);
+            let tokens = await generateARTokens({}, client_id, scopes, serverOpts, false);
 
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,

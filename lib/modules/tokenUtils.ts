@@ -1,5 +1,5 @@
 import * as jwt from "jsonwebtoken";
-import {ARTokensResponse} from "../components/types";
+import {ARTokens} from "../components/types";
 import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
 
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
@@ -17,9 +17,19 @@ export function verifyToken(token: string, secret: string): object | null {
     }
 }
 
-export async function generateARTokens(payload: object, opts: AuthorizationServerOptions, issueRefreshToken: boolean): Promise<ARTokensResponse> {
-    let accessTokenPayload = {...payload, type: 'access_token'};
-    let refreshTokenPayload = {...payload, type: 'refresh_token'};
+export async function generateARTokens(payload: object, client_id: string, scopes: string[], opts: AuthorizationServerOptions, issueRefreshToken: boolean): Promise<ARTokens> {
+    let accessTokenPayload = {
+        ...payload,
+        type: 'access_token',
+        client_id,
+        scopes
+    };
+    let refreshTokenPayload = {
+        ...payload,
+        type: 'refresh_token',
+        client_id,
+        scopes
+    };
 
     let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.accessTokenLifetime ?? undefined);
     let refreshToken: string | undefined;
@@ -33,6 +43,6 @@ export async function generateARTokens(payload: object, opts: AuthorizationServe
         token_type: 'Bearer',
         expires_in: opts.accessTokenLifetime != null ? opts.accessTokenLifetime : undefined,
         refresh_token: refreshToken,
-        scope: (payload as any).scopes.join(opts.scopeDelimiter)
+        scope: scopes.join(opts.scopeDelimiter)
     };
 }

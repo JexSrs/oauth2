@@ -10,11 +10,7 @@ export function implicit(): Implementation {
             let {client_id} = req.query;
 
             // Generate access & refresh tokens
-            let tokens = await generateARTokens({
-                client_id,
-                user,
-                scopes
-            }, serverOpts, false);
+            let tokens = await generateARTokens({user}, client_id, scopes, serverOpts, false);
 
             // Database save
             let dbRes = await serverOpts.saveTokens({
