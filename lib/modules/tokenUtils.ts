@@ -1,67 +1,37 @@
 import * as jwt from "jsonwebtoken";
+import {ARTokensResponse} from "../components/types";
 import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
-import {ARTokensResponse, OAuth2Error} from "../components/types";
-import {AuthorizeErrorRequest} from "../components/errors/authorizeErrorRequest";
-import {GrantType} from "../components/GrantType";
 
-export function signToken(payload: object, secret: string, issuer: string, expiresIn?: number): string {
+export function signToken(payload: object, secret: string, expiresIn?: number): string {
     return jwt.sign(payload, secret, {
         algorithm: 'HS512',
         expiresIn,
-        issuer,
-        audience: 'api://default'
     });
 }
 
-export function verifyToken(token: string, secret: string, issuer: string): object | null {
+export function verifyToken(token: string, secret: string): object | null {
     try {
-        return jwt.verify(token, secret, {
-            algorithms: ['HS512'],
-            issuer,
-        }) as any;
+        return jwt.verify(token, secret) as any;
     } catch (e) {
         return null;
     }
 }
 
-export async function generateARTokens(payload: object, req: any, opts: Partial<AuthorizationServerOptions>, generateRefreshToken: boolean = true): Promise<ARTokensResponse | OAuth2Error> {
-    let accessTokenPayload = {
-        ...payload,
-        type: 'accessToken'
-    };
-    let refreshTokenPayload = {
-        ...payload,
-        type: 'refreshToken'
-    };
+export async function generateARTokens(payload: object, opts: AuthorizationServerOptions, issueRefreshToken: boolean): Promise<ARTokensResponse> {
+    let accessTokenPayload = {...payload, type: 'access_token'};
+    let refreshTokenPayload = {...payload, type: 'refresh_token'};
 
-    let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.issuer, opts.accessTokenLifetime ?? undefined);
+    let accessToken: string = signToken(accessTokenPayload, opts.secret, opts.accessTokenLifetime ?? undefined);
     let refreshToken: string | undefined;
 
     // Allow when asked && grant type is available && accessToken does not expire
-    if (generateRefreshToken
-        && opts.grantTypes.includes(GrantType.REFRESH_TOKEN)
-        && opts.accessTokenLifetime != null)
-        refreshToken = signToken(refreshTokenPayload, opts.secret, opts.issuer, opts.refreshTokenLifetime ?? undefined);
-
-    // Database save
-    let dbRes = await opts.tokenHandler.saveTokens({
-        accessToken,
-        accessTokenExpiresAt: Math.trunc((Date.now() + opts.accessTokenLifetime * 1000) / 1000),
-        refreshToken,
-        refreshTokenExpiresAt: Math.trunc((Date.now() + opts.refreshTokenLifetime * 1000) / 1000),
-        clientId: (payload as any).client_id,
-        user: (payload as any).user,
-        scopes: (payload as any).scopes,
-    });
-    if(!dbRes) return {
-        error: AuthorizeErrorRequest.SERVER_ERROR,
-        error_description: 'Encountered an unexpected database error'
-    };
+    if (issueRefreshToken && opts.accessTokenLifetime != null)
+        refreshToken = signToken(refreshTokenPayload, opts.secret, opts.refreshTokenLifetime ?? undefined);
 
     return {
         access_token: accessToken,
         token_type: 'Bearer',
-        expires_in: opts.accessTokenLifetime,
+        expires_in: opts.accessTokenLifetime != null ? opts.accessTokenLifetime : undefined,
         refresh_token: refreshToken,
         scope: (payload as any).scopes.join(opts.scopeDelimiter)
     };

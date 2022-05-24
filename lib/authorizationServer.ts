@@ -1,21 +1,8 @@
-import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
 import {ExpressMiddleware} from "./components/types";
-import {
-    authenticateError,
-    buildRedirectURI,
-    checkOptions,
-    codeChallengeHash,
-    tokenError,
-    authorizeError,
-    getGrantType, isEmbeddedWebView,
-    mergeOptions,
-} from "./modules/utils";
-import {generateARTokens, signToken, verifyToken} from './modules/tokenUtils'
-import {memory} from "./modules/memory";
-import {GrantType} from "./components/GrantType";
-import {TokenErrorRequest} from "./components/errors/tokenErrorRequest";
-import {AuthorizeErrorRequest} from "./components/errors/authorizeErrorRequest";
-import {AuthenticateErrorRequest} from "./components/errors/authenticateErrorRequest";
+import {buildRedirectURI, isEmbeddedWebView} from "./modules/utils";
+import {verifyToken} from './modules/tokenUtils'
+import {Implementation} from "./components/implementation";
+import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
 
 export class AuthorizationServer {
 
@@ -37,35 +24,18 @@ export class AuthorizationServer {
 
     // TODO - Add option to do all checks asynchronous with Promise.all([w1, w2, w3]).spread(function (r1, r2, r3) {})
 
-    private readonly options: Partial<AuthorizationServerOptions>;
+    private readonly options: AuthorizationServerOptions;
+    private readonly implementations: Implementation[] = [];
+    private issueRefreshToken: boolean = false;
 
-    constructor(options: Partial<AuthorizationServerOptions>) {
-        let opts: Partial<AuthorizationServerOptions> = options;
-
-        if (!opts.grantTypes)
-            opts.grantTypes = [GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN];
-
-        // Remove duplicate records
-        opts.grantTypes = opts.grantTypes.filter((e, i) => opts.grantTypes.indexOf(e) === i);
+    constructor(options: AuthorizationServerOptions) {
+        let opts: AuthorizationServerOptions = options;
 
         if (!opts.getToken)
             opts.getToken = (req) => req.headers['authorization']?.split(' ')?.[1];
 
         if (!opts.setPayloadLocation)
             opts.setPayloadLocation = (req, payload) => req.payload = payload;
-
-        if (typeof opts.usePKCE === 'undefined') opts.usePKCE = true;
-
-        if (typeof opts.allowCodeChallengeMethodPlain === 'undefined')
-            opts.allowCodeChallengeMethodPlain = false;
-
-        if (!opts.getClientCredentials) opts.getClientCredentials = (req: any) => {
-            let authHeader = req.headers['authorization'];
-            let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
-
-            let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
-            return {client_id, client_secret};
-        };
 
         if (typeof opts.accessTokenLifetime !== 'undefined') {
             if (opts.accessTokenLifetime <= 0 || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime)
@@ -77,216 +47,70 @@ export class AuthorizationServer {
         else if (opts.refreshTokenLifetime <= 0 || Math.trunc(opts.refreshTokenLifetime) !== opts.refreshTokenLifetime)
             throw new Error('refreshTokenLifetime is not positive integer.')
 
-        if (typeof opts.authorizationCodeLifetime === 'undefined')
-            opts.authorizationCodeLifetime = 60;
-        else if (opts.authorizationCodeLifetime <= 0 || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
-            throw new Error('authorizationCodeLifetime is not positive integer.')
-
-        if (!opts.tokenHandler)
-            opts.tokenHandler = memory();
-
-        if (!opts.scopeDelimiter)
-            opts.scopeDelimiter = ' ';
-
-        if(typeof opts.isTemporaryUnavailable === 'undefined')
+        if (typeof opts.isTemporaryUnavailable === 'undefined')
             opts.isTemporaryUnavailable = false;
 
-        if(!opts.issuer)
-            opts.issuer = '';
-
-        if(typeof opts.rejectEmbeddedWebViews === 'undefined')
+        if (typeof opts.rejectEmbeddedWebViews === 'undefined')
             opts.rejectEmbeddedWebViews = true;
 
-        if(typeof opts.isGrantTypeAllowed === 'undefined')
+        if (typeof opts.isGrantTypeAllowed === 'undefined')
             opts.isGrantTypeAllowed = (client_id) => true;
+
+        if (typeof opts.scopeDelimiter === 'undefined')
+            opts.scopeDelimiter = ' ';
 
         this.options = opts;
     }
 
-    private static async authorizationCode1(req: any, res: any, opts: Partial<AuthorizationServerOptions>, scopes: string[], user: any): Promise<void> {
-        let {state, client_id, redirect_uri, code_challenge, code_challenge_method} = req.query;
+    public use(implementation: Implementation | Implementation[]): AuthorizationServer {
+        let imps = Array.isArray(implementation) ? implementation : [implementation];
 
-        // Check for PKCE
-        if (opts.usePKCE) {
-            if (!code_challenge)
-                return authorizeError(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'Missing code challenge.')
-            if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !opts.allowCodeChallengeMethodPlain))
-                return authorizeError(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'Code challenge method is not valid.')
-        }
+        imps.forEach(imp => {
+            // Name check
+            if (!imp.name)
+                throw new Error('Implementation name is missing');
 
-        // Generate authorization code
-        let payload = {client_id, user};
-        let code = signToken(payload, opts.secret, opts.issuer, opts.authorizationCodeLifetime);
+            // Endppoint check
+            if (imp.endpoint !== 'token' && imp.endpoint !== 'authorize')
+                throw new Error(`Implementation ${imp.name} has invalid endpoint`);
 
-        // Save authorization code to database
-        let dbRes = await opts.tokenHandler.saveAuthorizationCode({
-            authorizationCode: code,
-            expiresAt: Math.trunc((Date.now() + opts.authorizationCodeLifetime * 1000) / 1000),
-            clientId: client_id,
-            redirectUri: redirect_uri,
-            user,
-            scopes,
-            codeChallenge: code_challenge,
-            codeChallengeMethod: code_challenge_method
-        });
-        if(!dbRes) {
-            authorizeError(res, AuthorizeErrorRequest.SERVER_ERROR, redirect_uri, state, 'Encountered an unexpected database error')
-            return;
-        }
+            // Response or grant type check
+            if (typeof imp.matchType !== 'string')
+                throw new Error('Implementation match type is not valid');
+            if (imp.matchType.trim().length === 0)
+                console.log(`Implementation ${imp.name} has empty match type which is not recommended`);
 
-        // Respond with authorization code
-        res.header('Cache-Control', 'no-store').redirect(buildRedirectURI(redirect_uri, {code, state}));
-    }
+            // Match type duplication check for each endpoint
+            let i;
+            if ((i = imps.find(i => i.endpoint === imp.endpoint && i.matchType === imp.matchType)) != null)
+                throw new Error(`Implementation ${imp.name} has the same match type as ${i.matchType}`);
 
-    private static async implicit(req: any, res: any, opts: Partial<AuthorizationServerOptions>, scopes: string[], user: any): Promise<void> {
-        let {state, client_id, redirect_uri} = req.query;
+            if (typeof imp.function !== 'function')
+                throw new Error(`Implementation ${imp.name} has invalid function`);
 
-        // Generate access & refresh tokens
-        let payload = {client_id, user, scopes};
-        let tokens = await generateARTokens(payload, req, opts, false);
+            if (imp.name === 'refresh-token')
+                this.issueRefreshToken = true;
 
-        // Respond with tokens
-        res.header('Cache-Control', 'no-store').redirect(buildRedirectURI(redirect_uri, {...tokens, state}));
-    }
-
-    private static async authorizationCode2(req: any, res: any, opts: Partial<AuthorizationServerOptions>): Promise<void> {
-        let {client_id, client_secret} = opts.getClientCredentials(req);
-        let {code, redirect_uri, code_verifier} = req.body;
-        if (!client_id) client_id = req.body.client_id;
-
-        // Check PKCE parameter
-        if (opts.usePKCE && !code_verifier)
-            return tokenError(res, TokenErrorRequest.INVALID_REQUEST, 'Missing code verifier')
-
-        // Token verification
-        let authCodePayload: any = verifyToken(code, opts.secret, opts.issuer);
-        if (!authCodePayload)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Authorization code is not valid or has expired');
-
-        // Payload verification
-        if (authCodePayload.client_id !== client_id)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Authorization code does not belong to the client');
-
-        // Do database request at last to lessen db costs.
-        if (!(await opts.validateClient(client_id, client_secret)))
-            return tokenError(res, TokenErrorRequest.UNAUTHORIZED_CLIENT, 'Client authentication failed');
-
-        // Database verification
-        let dbCode = await opts.tokenHandler.getAuthorizationCode({
-            clientId: client_id,
-            authorizationCode: code,
-            user: authCodePayload.user
+            this.implementations.push(imp)
         });
 
-        if (!dbCode || dbCode.authorizationCode !== code)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Authorization code is not valid or has expired');
-
-        if (redirect_uri !== dbCode.redirectUri)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Redirect URI is not the same that was used during authorization code grant');
-
-        // Check PKCE
-        if (opts.usePKCE) {
-            if (dbCode.codeChallenge !== codeChallengeHash((dbCode.codeChallengeMethod as any), code_verifier))
-                return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Code verifier is not valid');
-        }
-
-        // Database delete
-        await opts.tokenHandler.deleteAuthorizationCode({
-            clientId: client_id,
-            authorizationCode: code,
-            user: authCodePayload.user
-        });
-
-        // Generate access & refresh tokens
-        let response = await generateARTokens({
-            client_id,
-            user: dbCode.user,
-            scopes: dbCode.scopes
-        }, req, opts);
-        res.status(200).header('Cache-Control', 'no-store').json(response);
-    }
-
-    private static async resourceOwnerCredentials(req: any, res: any, opts: Partial<AuthorizationServerOptions>, scopes: string[]): Promise<void> {
-        let {client_id, client_secret} = opts.getClientCredentials(req);
-        let {username, password} = req.body;
-
-        // Do database request at last to lessen db costs.
-        if (!(await opts.validateClient(client_id, client_secret)))
-            return tokenError(res, TokenErrorRequest.UNAUTHORIZED_CLIENT, 'Client authentication failed');
-
-        let user = await opts.validateUser(username, password);
-        if (!user) return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Client authentication failed');
-
-        let payload = {client_id, user, scopes};
-        // Generate access & refresh tokens
-        let response = await generateARTokens(payload, req, opts);
-        res.status(200).header('Cache-Control', 'no-store').json(response);
-    }
-
-    private static async clientCredentials(req: any, res: any, opts: Partial<AuthorizationServerOptions>, scopes: string[]): Promise<void> {
-        let {client_id, client_secret} = opts.getClientCredentials(req);
-
-        // Do database request at last to lessen db costs.
-        if (!(await opts.validateClient(client_id, client_secret)))
-            return tokenError(res, TokenErrorRequest.UNAUTHORIZED_CLIENT, 'Client authentication failed');
-
-        // Generate access & refresh tokens
-        let response = await generateARTokens({client_id, scopes}, req, opts, false);
-        res.status(200).header('Cache-Control', 'no-store').json(response);
-    }
-
-    private static async refreshToken(req: any, res: any, opts: Partial<AuthorizationServerOptions>): Promise<void> {
-        let {client_id, client_secret} = opts.getClientCredentials(req);
-        let {scope, refresh_token} = req.body;
-        if (!client_id) client_id = req.body.client_id;
-
-        let refreshTokenPayload: any = verifyToken(refresh_token, opts.secret, opts.issuer);
-        if (!refreshTokenPayload)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Refresh token is not valid');
-
-        // Check scopes - No need to check with app because the new scopes must
-        // be subset of the refreshTokenPayload.scopes
-        let scopes: string[] | null = scope.split(opts.scopeDelimiter);
-        if (refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
-            return tokenError(res, TokenErrorRequest.INVALID_SCOPE, 'One or more scopes are not acceptable');
-
-        if (refreshTokenPayload.client_id !== client_id)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Refresh token does not belong to client');
-
-        // If client_secret was passed then verify client (else it will be verified by the access token).
-        if (client_secret && !(await opts.validateClient(client_id, client_secret)))
-            return tokenError(res, TokenErrorRequest.UNAUTHORIZED_CLIENT, 'Client authentication failed');
-
-        let dbToken = await opts.tokenHandler.getRefreshToken({
-            refreshToken: refresh_token,
-            clientId: client_id,
-            user: refreshTokenPayload.user,
-        });
-
-        if (!dbToken || dbToken !== refresh_token)
-            return tokenError(res, TokenErrorRequest.INVALID_GRANT, 'Refresh token is not valid');
-
-        // Remove old tokens from database
-        await opts.tokenHandler.deleteTokens({
-            refreshToken: refresh_token,
-            clientId: client_id,
-            user: refreshTokenPayload.user
-        });
-
-        let response = await generateARTokens({client_id, scopes}, req, opts);
-        res.status(200).header('Cache-Control', 'no-store').json(response);
-    }
-
-    private static async deviceFlow(req: any, res: any, opts: Partial<AuthorizationServerOptions>): Promise<void> {
-
+        return this;
     }
 
     /**
      * Assign this function to the 'authorize' endpoint.
      */
-    public authorize(options?: Partial<AuthorizationServerOptions>): ExpressMiddleware {
-        const opts = mergeOptions(this.options, options);
-        checkOptions(opts, 'authorize');
+    public authorize(): ExpressMiddleware {
+        function error(res: any, err: string, redirectUri: string, state: string, description: string): void {
+            description = description.endsWith('.') ? description : `${description}.`;
+            res.header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+                .redirect(buildRedirectURI(redirectUri, {
+                    error: err,
+                    error_description: description,
+                    error_uri: 'Please check the docs for more information',
+                    state
+                }));
+        }
 
         return async (req, res, next) => {
             if (req.method !== 'GET') {
@@ -297,46 +121,75 @@ export class AuthorizationServer {
             const {client_id, redirect_uri, state, scope, response_type} = req.query;
 
             // Validate client_id and redirect_uri
-            if (!(await opts.validateRedirectURI(client_id, redirect_uri)))
-                return tokenError(res, TokenErrorRequest.INVALID_REQUEST, 'Client id or redirect URI are not registered');
+            if (!(await this.options.validateRedirectURI(client_id, redirect_uri))) {
+                let err = 'invalid_request';
+                let description = 'Client id or redirect URI are not registered';
+                res.status(400)
+                    .header('WWW-Authenticate', `Bearer error=${err}`)
+                    .header('WWW-Authenticate', `error_description=${description}`)
+                    .json({
+                        error: err,
+                        error_description: 'description',
+                        error_uri: 'Please check the docs for more information.'
+                    });
+                return;
+            }
 
-            if((typeof opts.isTemporaryUnavailable === 'boolean' ? opts.isTemporaryUnavailable : await opts.isTemporaryUnavailable(req)))
-                return authorizeError(res, AuthorizeErrorRequest.TEMPORARY_UNAVAILABLE, redirect_uri, state, 'The authorization server is temporary unavailable.')
+            if ((typeof this.options.isTemporaryUnavailable === 'boolean' ? this.options.isTemporaryUnavailable : await this.options.isTemporaryUnavailable(req)))
+                return error(res, 'temporary_unavailable', redirect_uri, state, 'The authorization server is temporary unavailable.')
 
-            if(opts.rejectEmbeddedWebViews && isEmbeddedWebView(req))
-                return authorizeError(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'The request was made from an embedded web view, which is not allowed.')
+            if (this.options.rejectEmbeddedWebViews && isEmbeddedWebView(req))
+                return error(res, 'invalid_request', redirect_uri, state, 'The request was made from an embedded web view, which is not allowed.')
 
             let user: any;
-            if ((user = opts.getUser(req)) == null)
-                return authorizeError(res, AuthorizeErrorRequest.ACCESS_DENIED, redirect_uri, state, 'User did not approve request')
+            if ((user = this.options.getUser(req)) == null)
+                return error(res, 'access_denied', redirect_uri, state, 'User did not approve request')
 
-            let gt: GrantType | null = getGrantType(response_type);
-            if (!gt || !opts.grantTypes.includes(gt))
-                return authorizeError(res, AuthorizeErrorRequest.UNSUPPORTED_RESPONSE_TYPE, redirect_uri, state, 'response_type is not supported');
+            let imp = this.implementations.find(imp => imp.endpoint === 'authorize' && imp.matchType === response_type);
+            if (!imp)
+                return error(res, 'unsupported_response_type', redirect_uri, state, 'response_type is not supported');
 
-            if(!(await opts.isGrantTypeAllowed(client_id, gt)))
-                return authorizeError(res, AuthorizeErrorRequest.UNAUTHORIZED_CLIENT, redirect_uri, state, 'This client is not allowed to use this grant type')
+            if (!(await this.options.isGrantTypeAllowed(client_id, imp.matchType)))
+                return error(res, 'unauthorized_client', redirect_uri, state, 'This client is not allowed to use this grant type')
 
             // Validate scopes
-            let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
-            if (!(await options.isScopesValid(scopes)))
-                return authorizeError(res, AuthorizeErrorRequest.INVALID_SCOPE, redirect_uri, state, 'One or more scopes are not acceptable');
+            let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
+            if (!(await this.options.isScopesValid(scopes)))
+                return error(res, 'invalid-scope', redirect_uri, state, 'One or more scopes are not acceptable');
 
-            if (response_type === 'code')
-                AuthorizationServer.authorizationCode1(req, res, opts, scopes, user);
-            else if (response_type === 'token')
-                AuthorizationServer.implicit(req, res, opts, scopes, user);
-            else authorizeError(res, AuthorizeErrorRequest.INVALID_REQUEST, redirect_uri, state, 'response_type is not acceptable');
+            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+                let r: any = err ? err : response;
+                r.state = state;
 
+                if (err) {
+                    r.error_uri = r.error_uri ? r.error_uri : this.options.errorUri;
+                    delete r.status;
+                } else {
+                    res.header('Cache-Control', 'no-store');
+                }
+                res.redirect(buildRedirectURI(redirect_uri, {...r, state}));
+            }, scopes, user);
         };
     }
 
     /**
      * Assign this function to the 'token' endpoint.
      */
-    public token(options?: Partial<AuthorizationServerOptions>): ExpressMiddleware {
-        const opts = mergeOptions(this.options, options);
-        checkOptions(opts, 'token');
+    public token(): ExpressMiddleware {
+        function error(res: any, err: string, description: string): void {
+            let status = 400;
+            if (err === 'invalid_client')
+                status = 401;
+
+            description = description.endsWith('.') ? description : `${description}.`;
+            res.status(status)
+                .header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+                .json({
+                    error: err,
+                    error_description: description,
+                    error_uri: 'Please check the docs for more information.'
+                });
+        }
 
         return async (req, res, next) => {
             if (req.method !== 'POST') {
@@ -344,75 +197,75 @@ export class AuthorizationServer {
                 return;
             }
 
-            const {grant_type, scope} = req.body;
+            const {grant_type} = req.body;
 
-            let gt: GrantType | null = getGrantType(grant_type);
-            if (!gt || !opts.grantTypes.includes(gt))
-                return tokenError(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
+            let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
+            if (!imp)
+                return error(res, 'unsupported_grant_type', 'grant_type is not acceptable');
 
-            if (grant_type === 'password' || grant_type === 'client_credentials') {
-                // Check scopes
-                let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
-                if (!(await options.isScopesValid(scopes)))
-                    return tokenError(res, TokenErrorRequest.INVALID_SCOPE, 'One or more scopes are not acceptable');
+            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+                if (err) {
+                    res.status(err.status || 400);
+                    delete err.status;
+                    err.error_uri = err.error_uri ? err.error_uri : this.options.errorUri;
+                    res.json(err);
+                    return;
+                }
 
-                if (grant_type === 'password')
-                    AuthorizationServer.resourceOwnerCredentials(req, res, opts, scopes);
-                else if (grant_type === 'client_credentials')
-                    AuthorizationServer.clientCredentials(req, res, opts, scopes);
-
-            }
-            else if (grant_type === 'authorization_code')
-                AuthorizationServer.authorizationCode2(req, res, opts);
-            else if (grant_type === 'refresh_token')
-                AuthorizationServer.refreshToken(req, res, opts);
-            else if (grant_type === 'device_flow')
-                AuthorizationServer.deviceFlow(req, res, opts);
-            else tokenError(res, TokenErrorRequest.UNSUPPORTED_GRANT_TYPE, 'grant_type is not acceptable');
+                res.status(200).header('Cache-Control', 'no-store').json(response);
+            }, undefined, undefined);
         };
     }
 
     /**
      * This function will be used to authenticate a request if the resource and authorization server
      * are one and the same. If they are different checkout the introspection endpoint.
-     * @param options
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *              then the authentication will fail. If scope is not initialized then the scope
      *              check will be omitted.
      */
-    public authenticate(options?: Partial<AuthorizationServerOptions> | string | string[], scope?: string | string[]): ExpressMiddleware {
-        // Pass scopes without custom options
-        if(typeof options === 'string' || Array.isArray(options)) {
-            scope = options;
-            options = undefined;
-        }
+    public authenticate(scope?: string | string[]): ExpressMiddleware {
+        function error(res: any, err: string, description: string): void {
+            let status = 0;
+            switch (err) {
+                case 'invalid_request':     status = 400; break;
+                case 'invalid_token':       status = 401; break;
+                case 'insufficient_scope':  status = 403; break;
+            }
 
-        const opts = mergeOptions(this.options, options as any);
-        checkOptions(opts, 'authenticate');
+            description = description.endsWith('.') ? description : `${description}.`;
+            res.status(status)
+                .header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+                .json({
+                    error: err,
+                    error_description: description,
+                    error_uri: 'Please check the docs for more information.'
+                });
+        }
 
         let scopes: string[] | null = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
-            let token = opts.getToken(req);
+            let token = this.options.getToken(req);
             if (!token)
-                return authenticateError(res, AuthenticateErrorRequest.INVALID_REQUEST, 'No access token was provided');
+                return error(res, 'invalid_request', 'No access token was provided');
 
-            let payload: any = verifyToken(token, opts.secret, opts.issuer);
+            let payload: any = verifyToken(token, this.options.secret);
             if (!payload)
-                return authenticateError(res, AuthenticateErrorRequest.INVALID_TOKEN, 'The access token expired');
+                return error(res, 'invalid_token', 'The access token expired');
 
             if (scopes && payload.scopes.some(v => !scopes.includes(v)))
-                return authenticateError(res, AuthenticateErrorRequest.INSUFFICIENT_SCOPE, 'Scopes re insufficient');
+                return error(res, 'insufficient_scope', 'Scopes re insufficient');
 
-            let dbToken = await opts.tokenHandler.getAccessToken({
+            let dbToken = await this.options.getAccessToken({
                 accessToken: token,
                 clientId: payload.client_id,
                 user: payload.user
             });
 
             if (!dbToken || dbToken !== token)
-                return authenticateError(res, AuthenticateErrorRequest.INVALID_TOKEN, 'The access token expired');
+                return error(res, 'invalid_token', 'The access token expired');
 
-            opts.setPayloadLocation(req, {
+            this.options.setPayloadLocation(req, {
                 clientId: payload.client_id,
                 user: payload.user,
                 scopes: payload.scopes,
@@ -423,14 +276,10 @@ export class AuthorizationServer {
 
     /**
      * Assign this function to the 'introspection' endpoint.
-     * This endpoint is meant to be accessible only by the resource server, if you make this endpoint
+     * This endpoint is meant to be accessible only by the resource servers, if you make this endpoint
      * public make sure to verify the client on your own before the request reach this function.
-     * @param options
      */
-    public introspection(options?: Partial<AuthorizationServerOptions>): ExpressMiddleware {
-        const opts = mergeOptions(this.options, options as any);
-        checkOptions(opts, 'introspection');
-
+    public introspection(): ExpressMiddleware {
         const inactive = (res): void => {
             res.status(200).json({active: false});
         }
@@ -442,12 +291,12 @@ export class AuthorizationServer {
             }
 
             const {token} = req.body;
-            if(!token) return inactive(res);
+            if (!token) return inactive(res);
 
-            let payload: any = verifyToken(token, opts.secret, opts.issuer);
+            let payload: any = verifyToken(token, this.options.secret);
             if (!payload) return inactive(res);
 
-            let dbToken = await opts.tokenHandler.getAccessToken({
+            let dbToken = await this.options.getAccessToken({
                 accessToken: token,
                 clientId: payload.client_id,
                 user: payload.user
@@ -458,7 +307,7 @@ export class AuthorizationServer {
 
             res.status(200).json({
                 active: true,
-                scope: payload.scopes.join(opts.scopeDelimiter),
+                scope: payload.scopes.join(' '),
                 client_id: payload.client_id,
                 user: payload.user,
                 exp: payload.exp
