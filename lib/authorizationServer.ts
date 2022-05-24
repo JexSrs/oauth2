@@ -125,7 +125,8 @@ export class AuthorizationServer {
                 let err = 'invalid_request';
                 let description = 'Client id or redirect URI are not registered';
                 res.status(400)
-                    .header('WWW-Authenticate', `Bearer error=${err}`)
+                    .header('WWW-Authenticate', `Bearer`)
+                    .header('WWW-Authenticate', `error=${err}`)
                     .header('WWW-Authenticate', `error_description=${description}`)
                     .json({
                         error: err,
@@ -183,7 +184,9 @@ export class AuthorizationServer {
 
             description = description.endsWith('.') ? description : `${description}.`;
             res.status(status)
-                .header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+                .header('WWW-Authenticate', `Bearer`)
+                .header('WWW-Authenticate', `error=${err}`)
+                .header('WWW-Authenticate', `error_description=${description}`)
                 .json({
                     error: err,
                     error_description: description,
