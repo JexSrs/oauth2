@@ -25,6 +25,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
     if(typeof opts.deleteAuthorizationCode !== 'function')
         throw new Error('deleteAuthorizationCode is not a function');
 
+    if(typeof opts.getIDTokenContent !== 'function')
+        opts.getIDTokenContent = (user) => null;
+
     return [
         {
             name: 'authorization-code',
@@ -38,7 +41,12 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     if (!code_challenge)
                         return callback(undefined, {
                             error: 'invalid_request',
-                            error_description: 'Missing code challenge',
+                            error_description: 'Query parameter code_challenge is missing',
+                        });
+                    if (!code_challenge_method)
+                        return callback(undefined, {
+                            error: 'invalid_request',
+                            error_description: 'Query parameter code_challenge_method is missing',
                         });
                     if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !opts.allowCodeChallengeMethodPlain))
                         return callback(undefined, {
@@ -65,7 +73,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if(!dbRes)
                     return callback(undefined, {
                         error: 'server_error',
-                        error_description: 'Encountered an unexpected database error',
+                        error_description: 'Encountered an unexpected error',
                     });
 
                 // Respond with authorization code
@@ -77,15 +85,26 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             endpoint: 'token',
             matchType: 'authorization_code',
             function: async (req, serverOpts, issueRefreshToken, callback) => {
-                let {client_id, client_secret} = opts.getClientCredentials(req);
+                let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
                 let {code, redirect_uri, code_verifier} = req.body;
                 if (client_id.length === 0) client_id = req.body.client_id;
 
-                // Check PKCE parameter
+                if (!code)
+                    return callback(undefined, {
+                        error: 'invalid_request',
+                        error_description: 'Property code is missing'
+                    });
+
+                if (!redirect_uri)
+                    return callback(undefined, {
+                        error: 'invalid_request',
+                        error_description: 'Property redirect_uri is missing'
+                    });
+
                 if (opts.usePKCE && !code_verifier)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Missing code verifier'
+                        error_description: 'Property code_verifier is missing'
                     });
 
                 // Token verification
@@ -93,14 +112,14 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if (!authCodePayload)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code is not valid or has expired'
+                        error_description: 'The authorization code has expired'
                     })
 
                 // Payload verification
                 if (authCodePayload.client_id !== client_id)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code does not belong to the client'
+                        error_description: `This authorization code does not belong to client ${client_id}`
                     });
 
                 // Client validation
@@ -120,22 +139,22 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if (!dbCode || dbCode.authorizationCode !== code)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code is not valid or has expired'
+                        error_description: 'The authorization code has expired'
                     });
 
                 // Check if redirect uri is the same that was generated on authorization code
                 if (redirect_uri !== dbCode.redirectUri)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Redirect URI is not the same that was used during authorization code grant'
+                        error_description: 'Redirect URI does not match the one that was used during authorization'
                     });
 
                 // Check PKCE
                 if (opts.usePKCE) {
-                    if (dbCode.codeChallenge !== codeChallengeHash((dbCode.codeChallengeMethod as any), code_verifier))
+                    if (dbCode.codeChallenge !== codeChallengeHash(dbCode.codeChallengeMethod, code_verifier))
                         return callback(undefined, {
                             error: 'invalid_grant',
-                            error_description: 'Code verifier is not valid'
+                            error_description: 'Client failed PKCE verification'
                         });
                 }
 
@@ -165,8 +184,13 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if(!dbRes)
                     return callback(undefined, {
                         error: 'server_error',
-                        error_description: 'Encountered an unexpected database error'
+                        error_description: 'Encountered an unexpected error'
                     });
+
+                // Generate ID token
+                let idToken = await opts.getIDTokenContent(dbCode.user);
+                if(idToken != null)
+                    tokens['id_token'] = signToken(idToken, serverOpts.secret);
 
                 // Respond with tokens
                 callback(tokens);

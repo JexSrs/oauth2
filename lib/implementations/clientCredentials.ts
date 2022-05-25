@@ -10,7 +10,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
         endpoint: 'token',
         matchType: 'client_credentials',
         function: async (req, serverOpts, issueRefreshToken, callback) => {
-            let {client_id, client_secret} = opts.getClientCredentials(req);
+            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
             const {scope} = req.body;
 
             // Validate scopes
@@ -42,7 +42,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
             if(!dbRes)
                 return callback(undefined, {
                     error: 'server_error',
-                    error_description: 'Encountered an unexpected database error'
+                    error_description: 'Encountered an unexpected error'
                 });
 
             // Respond with access token

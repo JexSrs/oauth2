@@ -8,7 +8,7 @@ export function buildRedirectURI(redirectURI: string, params: object): string {
     return r.substring(0, r.length - 1);
 }
 
-export function codeChallengeHash(challenge: 'plain' | 'S256', str: string): string {
+export function codeChallengeHash(challenge: 'plain' | 'S256' | undefined, str: string): string {
     let code = str;
     if (challenge === 'S256') {
         // Hash
@@ -30,16 +30,6 @@ export function isEmbeddedWebView(req: any): boolean {
 
 export function defaultCommonOpts(options: any) {
     let opts = options || {};
-
-    if(typeof opts.getClientCredentials !== 'function') {
-        opts.getClientCredentials = (req: any) => {
-            let authHeader = req.headers['authorization'];
-            let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
-
-            let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
-            return {client_id, client_secret};
-        };
-    }
 
     if(typeof opts.validateClient !== 'function')
         throw new Error('validateClient is not a function');

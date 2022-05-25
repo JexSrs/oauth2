@@ -22,6 +22,13 @@ export type AuthorizationCodeOptions = {
      */
     authorizationCodeLifetime?: number;
     /**
+     * If set it will return together with the access tokens and id token.
+     * Defaults to null.
+     * @param user The user's identification that was passed during authorization.
+     * @return {object|null} the object that will be included inside the id token. If null then no id token will be generated.
+     */
+    getIDTokenContent?: (user: any) => Promise<object | null> | object | null;
+    /**
      * The function that will save the authorization code to the database.
      * @param data The data that needs to be saved.
      * @return {boolean} true on succeed, false otherwise.

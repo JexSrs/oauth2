@@ -14,19 +14,19 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
         endpoint: 'token',
         matchType: 'password',
         function: async (req, serverOpts, issueRefreshToken, callback) => {
-            let {client_id, client_secret} = opts.getClientCredentials(req);
+            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
             const {scope, username, password} = req.body;
 
             if(!username)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Missing username'
+                    error_description: 'Property username is missing'
                 });
 
             if(!password)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Missing password'
+                    error_description: 'Property password is missing'
                 });
 
             let scopes = scope?.split(serverOpts.scopeDelimiter) || [];
@@ -67,7 +67,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             if(!dbRes)
                 return callback(undefined, {
                     error: 'server_error',
-                    error_description: 'Encountered an unexpected database error',
+                    error_description: 'Encountered an unexpected error',
                 });
 
             callback(tokens);

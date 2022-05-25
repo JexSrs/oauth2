@@ -24,7 +24,7 @@ export function implicit(): Implementation {
             if(!dbRes)
                 return callback(undefined, {
                     error: 'server_error',
-                    error_description: 'Encountered an unexpected database error'
+                    error_description: 'Encountered an unexpected error'
                 });
 
             callback(tokens);

@@ -16,20 +16,14 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
         endpoint: 'token',
         matchType: 'refresh_token',
         function: async (req, serverOpts, issueRefreshToken, callback) => {
-            let {client_id, client_secret} = opts.getClientCredentials(req);
+            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
             let {scope, refresh_token} = req.body;
             if (!client_id) client_id = req.body.client_id;
-
-            if(!client_id)
-                return callback(undefined, {
-                    error: 'invalid_request',
-                    error_description: 'Missing client id'
-                });
 
             if(!refresh_token)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Missing refresh token'
+                    error_description: 'Property refresh_token is missing'
                 });
 
             // Verify refresh token
@@ -37,13 +31,13 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if (!refreshTokenPayload)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Refresh token is not valid or has expired'
+                    error_description: 'The refresh token has expired'
                 });
 
             if(refreshTokenPayload.type !== 'refresh_token')
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Token is not a refresh token'
+                    error_description: 'Provided token is not a refresh token'
                 });
 
             // Check scopes - No need to check with app because the new scopes must
@@ -59,14 +53,14 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if (refreshTokenPayload.client_id !== client_id)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'One or more scopes are not acceptable'
+                    error_description: `This refresh token does not belong to client ${client_id}`
                 });
 
             // Validate client
             if (!(await opts.validateClient(client_id, client_secret)))
                 return callback(undefined, {
                     error: 'unauthorized_client',
-                    error_description: 'Refresh token does not belong to client'
+                    error_description: 'Client authentication failed'
                 });
 
             // Validate database
@@ -79,7 +73,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if (!dbToken || dbToken !== refresh_token)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Refresh token is not valid or has expired'
+                    error_description: 'The refresh token has expired'
                 });
 
             // Remove old tokens from database
@@ -109,7 +103,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if(!dbRes)
                 return callback(undefined, {
                     error: 'server_error',
-                    error_description: 'Encountered an unexpected database error',
+                    error_description: 'Encountered an unexpected error',
                 });
 
             callback(tokens);

@@ -59,6 +59,20 @@ export class AuthorizationServer {
         if (typeof opts.scopeDelimiter === 'undefined')
             opts.scopeDelimiter = ' ';
 
+        if(opts.getClientCredentials === 'http-basic-auth-header')
+            opts.getClientCredentials = (req: any) => {
+                let authHeader = req.headers['authorization'];
+                let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
+
+                let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
+                return {client_id, client_secret};
+            };
+        else if (opts.getClientCredentials === 'body')
+            opts.getClientCredentials = (req: any) => {
+                let {client_id, client_secret} = req.body;
+                return {client_id, client_secret};
+            };
+
         this.options = opts;
     }
 
@@ -98,8 +112,8 @@ export class AuthorizationServer {
     }
 
     /**
-     * Assign this function to the 'authorize' endpoint.
-     * Recommended endpoint: /api/oauth/v2/authorize
+     * Assign this function to the 'authorize' endpoint with GET method.
+     * Recommended endpoint: GET /api/oauth/v2/authorize
      */
     public authorize(): ExpressMiddleware {
         function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; body?: boolean; }) {
@@ -117,7 +131,7 @@ export class AuthorizationServer {
             res.header('Cache-Control', 'no-store')
                 .header('WWW-Authenticate', wwwAuthHeader)
 
-            if(data.body) res.json(resp)
+            if (data.body) res.json(resp)
             else res.redirect(buildRedirectURI(data.redirect_uri, resp));
         }
 
@@ -129,34 +143,38 @@ export class AuthorizationServer {
 
             const {client_id, redirect_uri, state, scope, response_type} = req.query;
 
-            if(!client_id)
+            if (!client_id)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Missing client id',
+                    error_description: 'Query parameter client_id is missing',
                 });
 
-            if(!redirect_uri)
+            if (!redirect_uri)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Missing redirect uri'
+                    error_description: 'Query parameter redirect_uri is missing'
                 });
 
-            if(!response_type)
+            if (!response_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'response_type redirect uri'
+                    error_description: 'Query parameter response_type is missing'
                 });
 
             // Validate client_id and redirect_uri
             if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Client id or redirect URI are not registered',
+                    error_description: 'Redirect URI is not registered',
                     error_uri: this.options.errorUri,
                     body: true
                 })
 
-            if ((typeof this.options.isTemporaryUnavailable === 'boolean' ? this.options.isTemporaryUnavailable : await this.options.isTemporaryUnavailable(req)))
+            // Server is temporary unavailable
+            if ((typeof this.options.isTemporaryUnavailable === 'boolean'
+                ? this.options.isTemporaryUnavailable
+                : await this.options.isTemporaryUnavailable(req))
+            )
                 return error(res, {
                     error: 'temporary_unavailable',
                     error_description: 'The authorization server is temporary unavailable',
@@ -165,6 +183,7 @@ export class AuthorizationServer {
                     state
                 });
 
+            // Reject embedded web views
             if (this.options.rejectEmbeddedWebViews && isEmbeddedWebView(req))
                 return error(res, {
                     error: 'invalid_request',
@@ -174,11 +193,12 @@ export class AuthorizationServer {
                     state
                 });
 
+            // Get user identification
             let user: any;
             if ((user = this.options.getUser(req)) == null)
                 return error(res, {
                     error: 'access_denied',
-                    error_description: 'User did not approve request',
+                    error_description: 'User did not authorize client',
                     error_uri: this.options.errorUri,
                     redirect_uri,
                     state
@@ -188,7 +208,7 @@ export class AuthorizationServer {
             if (!imp)
                 return error(res, {
                     error: 'unsupported_response_type',
-                    error_description: 'response_type is not supported',
+                    error_description: `Response type ${response_type} is not supported`,
                     error_uri: this.options.errorUri,
                     redirect_uri,
                     state
@@ -197,7 +217,7 @@ export class AuthorizationServer {
             if (!(await this.options.isGrantTypeAllowed(client_id, imp.matchType)))
                 return error(res, {
                     error: 'unauthorized_client',
-                    error_description: 'This client is not allowed to use this grant type',
+                    error_description: 'This client does not have access to use this authorization flow',
                     error_uri: this.options.errorUri,
                     redirect_uri,
                     state
@@ -214,33 +234,29 @@ export class AuthorizationServer {
                     state
                 });
 
+            // Call implementation function
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
                 if (err)
                     return error(res, {
-                        error: 'invalid_scope',
+                        error: err.error,
                         error_description: err.error_description,
                         error_uri: err.error_uri || this.options.errorUri,
                         redirect_uri,
                         state
                     });
 
-                res.header('Cache-Control', 'no-store')
-                    .redirect(
-                        buildRedirectURI(redirect_uri, {
-                            ...response,
-                            state
-                        })
-                    );
+                const url = buildRedirectURI(redirect_uri, {...response, state});
+                res.header('Cache-Control', 'no-store').redirect(url);
             }, scopes, user);
         };
     }
 
     /**
-     * Assign this function to the 'token' endpoint.
-     * Recommended endpoint: /api/oauth/v2/token
+     * Assign this function to the 'token' endpoint with POST method.
+     * Recommended endpoint: POST /api/oauth/v2/token
      */
     public token(): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & {status?: number}) {
+        function error(res: any, data: OAuth2Error & { status?: number }) {
             let wwwAuthHeader = `Bearer error=${data.error}`;
             if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
             if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
@@ -262,22 +278,22 @@ export class AuthorizationServer {
 
             const {grant_type} = req.body;
 
-            if(!grant_type)
+            if (!grant_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'grant_type redirect uri'
+                    error_description: 'Query parameter grant_type is missing'
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
             if (!imp)
                 return error(res, {
                     error: 'unsupported_grant_type',
-                    error_description: 'grant_type is not acceptable',
+                    error_description: `Grant type ${grant_type} is not supported`,
                     error_uri: this.options.errorUri
                 });
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
-                if(err)
+                if (err)
                     return error(res, {
                         error: err.error,
                         error_description: err.error_description,
@@ -300,27 +316,17 @@ export class AuthorizationServer {
      *              check will be omitted.
      */
     public authenticate(scope?: string | string[]): ExpressMiddleware {
-        function error(res: any, err: string, description: string): void {
-            let status = 0;
-            switch (err) {
-                case 'invalid_request':
-                    status = 400;
-                    break;
-                case 'invalid_token':
-                    status = 401;
-                    break;
-                case 'insufficient_scope':
-                    status = 403;
-                    break;
-            }
+        function error(res: any, data: OAuth2Error & { status?: number }): void {
+            let wwwAuthHeader = `Bearer error=${data.error}`;
+            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
+            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
 
-            description = description.endsWith('.') ? description : `${description}.`;
-            res.status(status)
-                .header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+            res.status(data.status || 400)
+                .header('WWW-Authenticate', wwwAuthHeader)
                 .json({
-                    error: err,
-                    error_description: description,
-                    error_uri: 'Please check the docs for more information.'
+                    error: data.error,
+                    error_description: data.error_description,
+                    error_uri: data.error_uri
                 });
         }
 
@@ -328,14 +334,28 @@ export class AuthorizationServer {
         return async (req, res, next) => {
             let token = this.options.getToken(req);
             if (!token)
-                return error(res, 'invalid_request', 'No access token was provided');
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'No access token was provided',
+                    error_uri: this.options.errorUri
+                });
 
             let payload: any = verifyToken(token, this.options.secret);
             if (!payload)
-                return error(res, 'invalid_token', 'The access token expired');
+                return error(res, {
+                    error: 'invalid_token',
+                    error_description: 'The access token has expired',
+                    error_uri: this.options.errorUri,
+                    status: 401
+                });
 
             if (scopes && payload.scopes.some(v => !scopes.includes(v)))
-                return error(res, 'insufficient_scope', 'Scopes re insufficient');
+                return error(res, {
+                    error: 'insufficient_scope',
+                    error_description: 'Client does not have access to this endpoint',
+                    error_uri: this.options.errorUri,
+                    status: 403
+                });
 
             let dbToken = await this.options.getAccessToken({
                 accessToken: token,
@@ -344,7 +364,12 @@ export class AuthorizationServer {
             });
 
             if (!dbToken || dbToken !== token)
-                return error(res, 'invalid_token', 'The access token expired');
+                return error(res, {
+                    error: 'invalid_token',
+                    error_description: 'The access token has expired',
+                    error_uri: this.options.errorUri,
+                    status: 401
+                });
 
             this.options.setPayloadLocation(req, {
                 clientId: payload.client_id,
@@ -356,10 +381,10 @@ export class AuthorizationServer {
     }
 
     /**
-     * Assign this function to the 'introspection' endpoint.
+     * Assign this function to the 'introspection' endpoint with POST method.
      * This endpoint is meant to be accessible only by the resource servers, if you make this endpoint
      * public make sure to verify the client on your own before the request reach this function.
-     * Recommended endpoint: /api/oauth/v2/introspection
+     * Recommended endpoint: POST /api/oauth/v2/introspection
      */
     public introspection(): ExpressMiddleware {
         const inactive = (res): void => {

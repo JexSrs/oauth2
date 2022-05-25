@@ -56,7 +56,14 @@ export type AuthorizationServerOptions = {
      * Defaults to ' ' (one space character).
      */
     scopeDelimiter?: string;
-
+    /**
+     * Override client credentials location.
+     * If one of the credentials is not found return undefined, null or empty string.
+     * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
+     * @param req The request instance.
+     * @return {object} the client_id and client_secret.
+     */
+    getClientCredentials?: 'http-basic-auth-header' | 'body' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
 
 
     /**
