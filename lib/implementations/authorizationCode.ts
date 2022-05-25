@@ -85,8 +85,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if (opts.usePKCE && !code_verifier)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Missing code verifier',
-                        status: 400,
+                        error_description: 'Missing code verifier'
                     });
 
                 // Token verification
@@ -94,24 +93,21 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if (!authCodePayload)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code is not valid or has expired',
-                        status: 400,
+                        error_description: 'Authorization code is not valid or has expired'
                     })
 
                 // Payload verification
                 if (authCodePayload.client_id !== client_id)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code does not belong to the client',
-                        status: 400,
+                        error_description: 'Authorization code does not belong to the client'
                     });
 
-                // Do database request at last to lessen db costs.
+                // Client validation
                 if (!(await opts.validateClient(client_id, client_secret)))
                     return callback(undefined, {
                         error: 'unauthorized_client',
-                        error_description: 'Client authentication failed',
-                        status: 400,
+                        error_description: 'Client authentication failed'
                     });
 
                 // Database verification
@@ -124,15 +120,14 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 if (!dbCode || dbCode.authorizationCode !== code)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Authorization code is not valid or has expired',
-                        status: 400,
+                        error_description: 'Authorization code is not valid or has expired'
                     });
 
+                // Check if redirect uri is the same that was generated on authorization code
                 if (redirect_uri !== dbCode.redirectUri)
                     return callback(undefined, {
                         error: 'invalid_grant',
-                        error_description: 'Redirect URI is not the same that was used during authorization code grant',
-                        status: 400,
+                        error_description: 'Redirect URI is not the same that was used during authorization code grant'
                     });
 
                 // Check PKCE
@@ -140,8 +135,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     if (dbCode.codeChallenge !== codeChallengeHash((dbCode.codeChallengeMethod as any), code_verifier))
                         return callback(undefined, {
                             error: 'invalid_grant',
-                            error_description: 'Code verifier is not valid',
-                            status: 400,
+                            error_description: 'Code verifier is not valid'
                         });
                 }
 
@@ -174,6 +168,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                         error_description: 'Encountered an unexpected database error'
                     });
 
+                // Respond with tokens
                 callback(tokens);
             }
         }

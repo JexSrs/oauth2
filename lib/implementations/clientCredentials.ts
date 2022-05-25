@@ -13,24 +13,25 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
             let {client_id, client_secret} = opts.getClientCredentials(req);
             const {scope} = req.body;
 
+            // Validate scopes
             let scopes = scope?.split(' ') || [];
             if (!(await serverOpts.isScopesValid(scopes)))
                 return callback(undefined, {
                     error: 'invalid_scope',
-                    error_description: 'One or more scopes are not acceptable',
-                    status: 400
+                    error_description: 'One or more scopes are not acceptable'
                 });
 
+            // Validate client
             if (!(await opts.validateClient(client_id, client_secret)))
                 return callback(undefined, {
                     error: 'unauthorized_client',
-                    error_description: 'Client authentication failed',
-                    status: 400
+                    error_description: 'Client authentication failed'
                 });
 
             // Generate access token
             let tokens = await generateARTokens({}, client_id, scopes, serverOpts, false);
 
+            // Save to database
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
                 accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
@@ -44,6 +45,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
                     error_description: 'Encountered an unexpected database error'
                 });
 
+            // Respond with access token
             callback(tokens);
         }
     }

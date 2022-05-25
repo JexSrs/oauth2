@@ -1,4 +1,4 @@
-import {ExpressMiddleware} from "./components/types";
+import {ExpressMiddleware, OAuth2Error} from "./components/types";
 import {buildRedirectURI, isEmbeddedWebView} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
@@ -102,17 +102,23 @@ export class AuthorizationServer {
      * Recommended endpoint: /api/oauth/v2/authorize
      */
     public authorize(): ExpressMiddleware {
-        function error(res: any, err: string, redirectUri: string, state: string, description: string): void {
-            description = description.endsWith('.') ? description : `${description}.`;
-            res.header('WWW-Authenticate', `Bearer`)
-                .header('WWW-Authenticate', `error=${err}`)
-                .header('WWW-Authenticate', `error_description=${description}`)
-                .redirect(buildRedirectURI(redirectUri, {
-                    error: err,
-                    error_description: description,
-                    error_uri: 'Please check the docs for more information',
-                    state
-                }));
+        function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; body?: boolean; }) {
+            let wwwAuthHeader = `Bearer error=${data.error}`;
+            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
+            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
+
+            let resp = {
+                error: data.error,
+                error_description: data.error_description,
+                error_uri: data.error_uri,
+                state: data.state
+            };
+
+            res.header('Cache-Control', 'no-store')
+                .header('WWW-Authenticate', wwwAuthHeader)
+
+            if(data.body) res.json(resp)
+            else res.redirect(buildRedirectURI(data.redirect_uri, resp));
         }
 
         return async (req, res, next) => {
@@ -123,57 +129,108 @@ export class AuthorizationServer {
 
             const {client_id, redirect_uri, state, scope, response_type} = req.query;
 
+            if(!client_id)
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'Missing client id',
+                });
+
+            if(!redirect_uri)
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'Missing redirect uri'
+                });
+
+            if(!response_type)
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'response_type redirect uri'
+                });
+
             // Validate client_id and redirect_uri
-            if (!(await this.options.validateRedirectURI(client_id, redirect_uri))) {
-                let err = 'invalid_request';
-                let description = 'Client id or redirect URI are not registered';
-                res.status(400)
-                    .header('WWW-Authenticate', `Bearer`)
-                    .header('WWW-Authenticate', `error=${err}`)
-                    .header('WWW-Authenticate', `error_description=${description}`)
-                    .json({
-                        error: err,
-                        error_description: 'description',
-                        error_uri: 'Please check the docs for more information.'
-                    });
-                return;
-            }
+            if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'Client id or redirect URI are not registered',
+                    error_uri: this.options.errorUri,
+                    body: true
+                })
 
             if ((typeof this.options.isTemporaryUnavailable === 'boolean' ? this.options.isTemporaryUnavailable : await this.options.isTemporaryUnavailable(req)))
-                return error(res, 'temporary_unavailable', redirect_uri, state, 'The authorization server is temporary unavailable.')
+                return error(res, {
+                    error: 'temporary_unavailable',
+                    error_description: 'The authorization server is temporary unavailable',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             if (this.options.rejectEmbeddedWebViews && isEmbeddedWebView(req))
-                return error(res, 'invalid_request', redirect_uri, state, 'The request was made from an embedded web view, which is not allowed.')
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'The request was made from an embedded web view, which is not allowed',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             let user: any;
             if ((user = this.options.getUser(req)) == null)
-                return error(res, 'access_denied', redirect_uri, state, 'User did not approve request')
+                return error(res, {
+                    error: 'access_denied',
+                    error_description: 'User did not approve request',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'authorize' && imp.matchType === response_type);
             if (!imp)
-                return error(res, 'unsupported_response_type', redirect_uri, state, 'response_type is not supported');
+                return error(res, {
+                    error: 'unsupported_response_type',
+                    error_description: 'response_type is not supported',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             if (!(await this.options.isGrantTypeAllowed(client_id, imp.matchType)))
-                return error(res, 'unauthorized_client', redirect_uri, state, 'This client is not allowed to use this grant type')
+                return error(res, {
+                    error: 'unauthorized_client',
+                    error_description: 'This client is not allowed to use this grant type',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
             if (!(await this.options.isScopesValid(scopes)))
-                return error(res, 'invalid-scope', redirect_uri, state, 'One or more scopes are not acceptable');
+                return error(res, {
+                    error: 'invalid_scope',
+                    error_description: 'One or more scopes are not acceptable',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
-                res.header('Cache-Control', 'no-store');
+                if (err)
+                    return error(res, {
+                        error: 'invalid_scope',
+                        error_description: err.error_description,
+                        error_uri: err.error_uri || this.options.errorUri,
+                        redirect_uri,
+                        state
+                    });
 
-                let r: any = response;
-                if (err) {
-                    delete err.status;
-                    err.error_uri = err.error_uri ? err.error_uri : this.options.errorUri;
-                    r = err;
-                }
-
-                r.state = state;
-
-                res.redirect(buildRedirectURI(redirect_uri, r));
+                res.header('Cache-Control', 'no-store')
+                    .redirect(
+                        buildRedirectURI(redirect_uri, {
+                            ...response,
+                            state
+                        })
+                    );
             }, scopes, user);
         };
     }
@@ -183,20 +240,17 @@ export class AuthorizationServer {
      * Recommended endpoint: /api/oauth/v2/token
      */
     public token(): ExpressMiddleware {
-        function error(res: any, err: string, description: string): void {
-            let status = 400;
-            if (err === 'invalid_client')
-                status = 401;
+        function error(res: any, data: OAuth2Error & {status?: number}) {
+            let wwwAuthHeader = `Bearer error=${data.error}`;
+            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
+            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
 
-            description = description.endsWith('.') ? description : `${description}.`;
-            res.status(status)
-                .header('WWW-Authenticate', `Bearer`)
-                .header('WWW-Authenticate', `error=${err}`)
-                .header('WWW-Authenticate', `error_description=${description}`)
+            res.status(data.status || 400)
+                .header('WWW-Authenticate', wwwAuthHeader)
                 .json({
-                    error: err,
-                    error_description: description,
-                    error_uri: 'Please check the docs for more information.'
+                    error: data.error,
+                    error_description: data.error_description,
+                    error_uri: data.error_uri
                 });
         }
 
@@ -208,22 +262,32 @@ export class AuthorizationServer {
 
             const {grant_type} = req.body;
 
+            if(!grant_type)
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'grant_type redirect uri'
+                });
+
             let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
             if (!imp)
-                return error(res, 'unsupported_grant_type', 'grant_type is not acceptable');
+                return error(res, {
+                    error: 'unsupported_grant_type',
+                    error_description: 'grant_type is not acceptable',
+                    error_uri: this.options.errorUri
+                });
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+                if(err)
+                    return error(res, {
+                        error: err.error,
+                        error_description: err.error_description,
+                        error_uri: err.error_uri ? err.error_uri : this.options.errorUri,
+                        status: err.status
+                    });
+
                 res.header('Cache-Control', 'no-store')
-                    .status(err ? err.status || 400 : 200);
-
-                let r = response;
-                if (err) {
-                    delete err.status;
-                    err.error_uri = err.error_uri ? err.error_uri : this.options.errorUri;
-                    r = err;
-                }
-
-                res.json(r);
+                    .status(err ? err.status || 400 : 200)
+                    .json(response);
             }, undefined, undefined);
         };
     }
@@ -239,9 +303,15 @@ export class AuthorizationServer {
         function error(res: any, err: string, description: string): void {
             let status = 0;
             switch (err) {
-                case 'invalid_request':     status = 400; break;
-                case 'invalid_token':       status = 401; break;
-                case 'insufficient_scope':  status = 403; break;
+                case 'invalid_request':
+                    status = 400;
+                    break;
+                case 'invalid_token':
+                    status = 401;
+                    break;
+                case 'insufficient_scope':
+                    status = 403;
+                    break;
             }
 
             description = description.endsWith('.') ? description : `${description}.`;

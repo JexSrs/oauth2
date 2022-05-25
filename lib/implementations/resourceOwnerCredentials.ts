@@ -17,28 +17,37 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             let {client_id, client_secret} = opts.getClientCredentials(req);
             const {scope, username, password} = req.body;
 
+            if(!username)
+                return callback(undefined, {
+                    error: 'invalid_request',
+                    error_description: 'Missing username'
+                });
+
+            if(!password)
+                return callback(undefined, {
+                    error: 'invalid_request',
+                    error_description: 'Missing password'
+                });
+
             let scopes = scope?.split(serverOpts.scopeDelimiter) || [];
-            if (!(await this.options.isScopesValid(scopes)))
+            if (!(await serverOpts.isScopesValid(scopes)))
                 return callback(undefined, {
                     error: 'invalid_scope',
-                    error_description: 'One or more scopes are not acceptable',
-                    status: 400
+                    error_description: 'One or more scopes are not acceptable'
                 });
 
             // Do database request at last to lessen db costs.
             if (!(await opts.validateClient(client_id, client_secret)))
                 return callback(undefined, {
                     error: 'unauthorized_client',
-                    error_description: 'Client authentication failed',
-                    status: 400
+                    error_description: 'Client authentication failed'
                 });
 
             let user = await opts.validateUser(username, password);
             if (!user)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'User authentication failed',
-                    status: 400
+                    error_description: 'User authentication failed'
                 });
 
             // Generate access & refresh tokens

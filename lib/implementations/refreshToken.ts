@@ -18,21 +18,32 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
         function: async (req, serverOpts, issueRefreshToken, callback) => {
             let {client_id, client_secret} = opts.getClientCredentials(req);
             let {scope, refresh_token} = req.body;
-            if (client_id.length === 0) client_id = req.body.client_id;
+            if (!client_id) client_id = req.body.client_id;
 
+            if(!client_id)
+                return callback(undefined, {
+                    error: 'invalid_request',
+                    error_description: 'Missing client id'
+                });
+
+            if(!refresh_token)
+                return callback(undefined, {
+                    error: 'invalid_request',
+                    error_description: 'Missing refresh token'
+                });
+
+            // Verify refresh token
             let refreshTokenPayload: any = verifyToken(refresh_token, serverOpts.secret);
             if (!refreshTokenPayload)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Refresh token is not valid or has expired',
-                    status: 400
+                    error_description: 'Refresh token is not valid or has expired'
                 });
 
             if(refreshTokenPayload.type !== 'refresh_token')
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Token is not a refresh token',
-                    status: 400
+                    error_description: 'Token is not a refresh token'
                 });
 
             // Check scopes - No need to check with app because the new scopes must
@@ -41,24 +52,24 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if (refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
                 return callback(undefined, {
                     error: 'invalid_scope',
-                    error_description: 'One or more scopes are not acceptable',
-                    status: 400
+                    error_description: 'One or more scopes are not acceptable'
                 });
 
+            // Verify refresh token payload
             if (refreshTokenPayload.client_id !== client_id)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'One or more scopes are not acceptable',
-                    status: 400
+                    error_description: 'One or more scopes are not acceptable'
                 });
 
+            // Validate client
             if (!(await opts.validateClient(client_id, client_secret)))
                 return callback(undefined, {
                     error: 'unauthorized_client',
-                    error_description: 'Refresh token does not belong to client',
-                    status: 400
+                    error_description: 'Refresh token does not belong to client'
                 });
 
+            // Validate database
             let dbToken = await opts.getRefreshToken({
                 refreshToken: refresh_token,
                 clientId: client_id,
@@ -68,8 +79,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if (!dbToken || dbToken !== refresh_token)
                 return callback(undefined, {
                     error: 'invalid_grant',
-                    error_description: 'Refresh token is not valid or has expired',
-                    status: 400
+                    error_description: 'Refresh token is not valid or has expired'
                 });
 
             // Remove old tokens from database
@@ -79,7 +89,8 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 user: refreshTokenPayload.user
             });
 
-            // Generate access token
+            // Generate new tokens
+            // If refresh token does not expire do not generate new refresh token
             let tokens = await generateARTokens({
                 user: refreshTokenPayload.user
             }, client_id, scopes, serverOpts, refreshTokenPayload.exp != null);
