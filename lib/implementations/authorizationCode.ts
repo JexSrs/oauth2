@@ -26,7 +26,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
         throw new Error('deleteAuthorizationCode is not a function');
 
     if(typeof opts.getIDTokenContent !== 'function')
-        opts.getIDTokenContent = (user) => null;
+        opts.getIDTokenContent = (user: any) => null;
 
     return [
         {
@@ -173,9 +173,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 // Database save
                 let dbRes = await serverOpts.saveTokens({
                     accessToken: tokens.access_token,
-                    accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
+                    accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
                     refreshToken: tokens.refresh_token,
-                    refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime * 1000) / 1000) : undefined,
+                    refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
                     clientId: client_id,
                     user: dbCode.user,
                     scopes: dbCode.scopes,
@@ -190,7 +190,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 // Generate ID token
                 let idToken = await opts.getIDTokenContent(dbCode.user);
                 if(idToken != null)
-                    tokens['id_token'] = signToken(idToken, serverOpts.secret);
+                    (tokens as any)['id_token'] = signToken(idToken, serverOpts.secret);
 
                 // Respond with tokens
                 callback(tokens);

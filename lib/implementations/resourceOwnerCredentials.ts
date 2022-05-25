@@ -56,9 +56,9 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             // Database save
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
+                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
                 refreshToken: tokens.refresh_token,
-                refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime * 1000) / 1000) : undefined,
+                refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
                 clientId: client_id,
                 user,
                 scopes,

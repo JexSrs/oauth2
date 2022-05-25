@@ -9,7 +9,7 @@
         "test": "test"
     },
     "scripts": {
-        "build": "rm -rf dist && tsc",
+        "build": "rm -rf dist && tsc -d",
         "test": "tsc && mocha --exit"
     },
     "license": "Apache-2.0",

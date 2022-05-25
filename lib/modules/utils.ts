@@ -1,9 +1,11 @@
 import * as crypto from "crypto";
 
-export function buildRedirectURI(redirectURI: string, params: object): string {
+export function buildRedirectURI(redirectURI: string, params: { [key: string]: string | undefined }): string {
     let r = `${redirectURI}?`;
-    for (const key in params)
-        r += `${key}=${params[key]}&`;
+    for (const key in params) {
+        if(params[key] !== undefined)
+            r += `${key}=${params[key]}&`;
+    }
 
     return r.substring(0, r.length - 1);
 }

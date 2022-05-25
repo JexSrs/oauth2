@@ -34,7 +34,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
             // Save to database
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
+                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
                 clientId: client_id,
                 scopes,
             });

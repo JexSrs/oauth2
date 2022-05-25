@@ -43,7 +43,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             // Check scopes - No need to check with app because the new scopes must
             // be subset of the refreshTokenPayload.scopes
             let scopes: string[] = scope.split(serverOpts.scopeDelimiter);
-            if (refreshTokenPayload.scopes.some(v => !scopes.includes(v)))
+            if (refreshTokenPayload.scopes.some((v: any) => !scopes.includes(v)))
                 return callback(undefined, {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable'
@@ -92,9 +92,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             // Database save
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
+                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
                 refreshToken: tokens.refresh_token,
-                refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime * 1000) / 1000) : undefined,
+                refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
                 clientId: client_id,
                 user: refreshTokenPayload.user,
                 scopes,

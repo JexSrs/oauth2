@@ -3,6 +3,7 @@ import {buildRedirectURI, isEmbeddedWebView} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
+import Require = NodeJS.Require;
 
 export class AuthorizationServer {
 
@@ -24,12 +25,12 @@ export class AuthorizationServer {
 
     // TODO - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 
-    private readonly options: AuthorizationServerOptions;
+    private readonly options: Required<AuthorizationServerOptions>;
     private readonly implementations: Implementation[] = [];
     private issueRefreshToken: boolean = false;
 
     constructor(options: AuthorizationServerOptions) {
-        let opts: AuthorizationServerOptions = options;
+        let opts: AuthorizationServerOptions = {...options};
 
         if (!opts.getToken)
             opts.getToken = (req) => req.headers['authorization']?.split(' ')?.[1];
@@ -37,15 +38,19 @@ export class AuthorizationServer {
         if (!opts.setPayloadLocation)
             opts.setPayloadLocation = (req, payload) => req.payload = payload;
 
-        if (typeof opts.accessTokenLifetime !== 'undefined') {
+        if (typeof opts.accessTokenLifetime === 'undefined')
+            opts.accessTokenLifetime = 86400;
+        else if (opts.accessTokenLifetime != null) {
             if (opts.accessTokenLifetime <= 0 || Math.trunc(opts.accessTokenLifetime) !== opts.accessTokenLifetime)
                 throw new Error('accessTokenLifetime is not positive integer.')
-        } else opts.accessTokenLifetime = 86400;
+        }
 
         if (typeof opts.refreshTokenLifetime === 'undefined')
-            opts.refreshTokenLifetime = 864000;
-        else if (opts.refreshTokenLifetime <= 0 || Math.trunc(opts.refreshTokenLifetime) !== opts.refreshTokenLifetime)
-            throw new Error('refreshTokenLifetime is not positive integer.')
+            opts.refreshTokenLifetime = 86400 * 10;
+        else if (opts.refreshTokenLifetime != null) {
+            if (opts.refreshTokenLifetime <= 0 || Math.trunc(opts.refreshTokenLifetime) !== opts.refreshTokenLifetime)
+                throw new Error('refreshTokenLifetime is not positive integer.')
+        }
 
         if (typeof opts.isTemporaryUnavailable === 'undefined')
             opts.isTemporaryUnavailable = false;
@@ -64,7 +69,7 @@ export class AuthorizationServer {
                 let authHeader = req.headers['authorization'];
                 let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
 
-                let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded);
+                let [client_id, client_secret] = /^([^:]*):(.*)$/.exec(decoded) ?? [];
                 return {client_id, client_secret};
             };
         else if (opts.getClientCredentials === 'body')
@@ -73,7 +78,7 @@ export class AuthorizationServer {
                 return {client_id, client_secret};
             };
 
-        this.options = opts;
+        this.options = opts as Required<AuthorizationServerOptions>;
     }
 
     public use(implementation: Implementation | Implementation[]): AuthorizationServer {
@@ -116,7 +121,7 @@ export class AuthorizationServer {
      * Recommended endpoint: GET /api/oauth/v2/authorize
      */
     public authorize(): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; body?: boolean; }) {
+        function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; }) {
             let wwwAuthHeader = `Bearer error=${data.error}`;
             if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
             if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
@@ -131,8 +136,10 @@ export class AuthorizationServer {
             res.header('Cache-Control', 'no-store')
                 .header('WWW-Authenticate', wwwAuthHeader)
 
-            if (data.body) res.json(resp)
-            else res.redirect(buildRedirectURI(data.redirect_uri, resp));
+            if (data.redirect_uri)
+                res.redirect(buildRedirectURI(data.redirect_uri, resp));
+            else
+                res.json(resp)
         }
 
         return async (req, res, next) => {
@@ -167,11 +174,10 @@ export class AuthorizationServer {
                     error: 'invalid_request',
                     error_description: 'Redirect URI is not registered',
                     error_uri: this.options.errorUri,
-                    body: true
                 })
 
             // Server is temporary unavailable
-            if ((typeof this.options.isTemporaryUnavailable === 'boolean'
+            if ((typeof this.options.isTemporaryUnavailable === 'boolean' || typeof this.options.isTemporaryUnavailable === 'undefined'
                 ? this.options.isTemporaryUnavailable
                 : await this.options.isTemporaryUnavailable(req))
             )
@@ -214,7 +220,7 @@ export class AuthorizationServer {
                     state
                 });
 
-            if (!(await this.options.isGrantTypeAllowed(client_id, imp.matchType)))
+            if (!(await this.options.isGrantTypeAllowed!(client_id, imp.matchType)))
                 return error(res, {
                     error: 'unauthorized_client',
                     error_description: 'This client does not have access to use this authorization flow',
@@ -301,9 +307,7 @@ export class AuthorizationServer {
                         status: err.status
                     });
 
-                res.header('Cache-Control', 'no-store')
-                    .status(err ? err.status || 400 : 200)
-                    .json(response);
+                res.header('Cache-Control', 'no-store').status(200).json(response);
             }, undefined, undefined);
         };
     }
@@ -330,9 +334,9 @@ export class AuthorizationServer {
                 });
         }
 
-        let scopes: string[] | null = Array.isArray(scope) ? scope : scope?.split(/, */);
+        let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
-            let token = this.options.getToken(req);
+            let token = this.options.getToken!(req);
             if (!token)
                 return error(res, {
                     error: 'invalid_request',
@@ -349,7 +353,7 @@ export class AuthorizationServer {
                     status: 401
                 });
 
-            if (scopes && payload.scopes.some(v => !scopes.includes(v)))
+            if (scopes && payload.scopes.some((v: string) => !scopes!.includes(v)))
                 return error(res, {
                     error: 'insufficient_scope',
                     error_description: 'Client does not have access to this endpoint',
@@ -387,7 +391,7 @@ export class AuthorizationServer {
      * Recommended endpoint: POST /api/oauth/v2/introspection
      */
     public introspection(): ExpressMiddleware {
-        const inactive = (res): void => {
+        const inactive = (res: any): void => {
             res.status(200).json({active: false});
         }
 

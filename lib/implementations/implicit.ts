@@ -10,15 +10,15 @@ export function implicit(): Implementation {
             let {client_id} = req.query;
 
             // Generate access token
-            let tokens = await generateARTokens({user}, client_id, scopes, serverOpts, false);
+            let tokens = await generateARTokens({user}, client_id, scopes!, serverOpts, false);
 
             // Database save
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime * 1000) / 1000) : undefined,
+                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
                 clientId: client_id,
                 user,
-                scopes,
+                scopes: scopes!,
             });
 
             if(!dbRes)

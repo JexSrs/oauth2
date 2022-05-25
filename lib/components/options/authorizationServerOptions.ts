@@ -34,7 +34,7 @@ export type AuthorizationServerOptions = {
      * with the justification of temporary unavailable.
      * Can also be an asynchronous function in case you want to ask a remote service.
      * Defaults to false.
-     * @return {boolean} true to abort, false otherwise.
+     * @return {boolean} True to abort, false otherwise.
      */
     isTemporaryUnavailable?: boolean | ((req: any) => Promise<boolean>);
     /**
@@ -48,7 +48,7 @@ export type AuthorizationServerOptions = {
      * For example if the client is confidential you may want to reject implicit grant type.
      * Defaults to true.
      * @param client_id
-     * @return {boolean} true if it is allowed, false otherwise.
+     * @return {boolean} True if it is allowed, false otherwise.
      */
     isGrantTypeAllowed?: (client_id: string, type: string) => Promise<boolean> | boolean;
     /**
@@ -61,7 +61,7 @@ export type AuthorizationServerOptions = {
      * If one of the credentials is not found return undefined, null or empty string.
      * Default to authorization header: Basic <BASE64({CLIENT ID}:{CLIENT SECRET})>
      * @param req The request instance.
-     * @return {object} the client_id and client_secret.
+     * @return {object} The client_id and client_secret.
      */
     getClientCredentials?: 'http-basic-auth-header' | 'body' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
 
@@ -71,7 +71,7 @@ export type AuthorizationServerOptions = {
      * registered matches the client's redirect uris.
      * @param client_id
      * @param redirect_uri
-     * @return {boolean} true if validation passes, false otherwise.
+     * @return {boolean} True if validation succeeds, false otherwise.
      */
     validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
     /**
@@ -79,14 +79,14 @@ export type AuthorizationServerOptions = {
      * This will be included in payloads so do not add sensitive data.
      * Return null, if the user did not authorize the request.
      * @param req The request instance.
-     * @return {string | object | number | (string | object | number | boolean)[] | null} The user's identification.
+     * @return {any} The user's identification or null to deny access.
      */
-    getUser: (req: any) => string | object | number | (string | object | number | boolean | null)[] | null;
+    getUser: (req: any) => any;
     /**
      * A function that asks if the passed scopes are valid. Not if permitted, this will be handled by the user.
      * If no scopes where send with the request then this function will be called once with an empty array.
      * @param scopes
-     * @return {boolean} true if scope is valid, false otherwise
+     * @return {boolean} True if scopes are valid, false otherwise.
      */
     isScopesValid: (scopes: string[]) => (Promise<boolean> | boolean);
     /**
@@ -96,11 +96,11 @@ export type AuthorizationServerOptions = {
     /**
      * The function that will load the accessToken from database.
      * @param data
-     * @return {string|null} The access token if it exists.
+     * @return {string|null} The access token if it exists, null otherwise.
      */
     getAccessToken: (data: THAccessTokenAsk) => Promise<string | null | undefined> | string | null | undefined;
     /**
-     * The error uri that will be passed in case of error.
+     * The error uri that will be passed with the response in case of error.
      */
     errorUri?: string;
     /**
