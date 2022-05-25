@@ -1,5 +1,5 @@
-import {Implementation} from "../../components/implementation";
-import {generateARTokens} from "../tokenUtils";
+import {Implementation} from "../components/implementation";
+import {generateARTokens} from "../modules/tokenUtils";
 
 export function implicit(): Implementation {
     return {

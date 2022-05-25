@@ -11,8 +11,6 @@ export class AuthorizationServer {
     //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
     //      - https://www.oauth.com/oauth2-servers/making-authenticated-requests/refreshing-an-access-token/
 
-    // TODO - Maybe add like google device: https://www.oauth.com/oauth2-servers/device-flow/
-
     // TODO - Add a way to identify if scopes are valid with client_id & user_id (maybe pass req, that contains query and user)
     //      - This also can be checked before authorization at previous middleware by parsing and checking scopes
 
@@ -23,6 +21,8 @@ export class AuthorizationServer {
     // TODO - Add checks for scopes when authorizing client (client may not be allowed to access specific scopes)
 
     // TODO - Add option to do all checks asynchronous with Promise.all([w1, w2, w3]).spread(function (r1, r2, r3) {})
+
+    // TODO - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 
     private readonly options: AuthorizationServerOptions;
     private readonly implementations: Implementation[] = [];
@@ -99,11 +99,14 @@ export class AuthorizationServer {
 
     /**
      * Assign this function to the 'authorize' endpoint.
+     * Recommended endpoint: /api/oauth/v2/authorize
      */
     public authorize(): ExpressMiddleware {
         function error(res: any, err: string, redirectUri: string, state: string, description: string): void {
             description = description.endsWith('.') ? description : `${description}.`;
-            res.header('WWW-Authenticate', `Bearer error=${err} error_description=${description}`)
+            res.header('WWW-Authenticate', `Bearer`)
+                .header('WWW-Authenticate', `error=${err}`)
+                .header('WWW-Authenticate', `error_description=${description}`)
                 .redirect(buildRedirectURI(redirectUri, {
                     error: err,
                     error_description: description,
@@ -159,22 +162,25 @@ export class AuthorizationServer {
                 return error(res, 'invalid-scope', redirect_uri, state, 'One or more scopes are not acceptable');
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
-                let r: any = err ? err : response;
+                res.header('Cache-Control', 'no-store');
+
+                let r: any = response;
+                if (err) {
+                    delete err.status;
+                    err.error_uri = err.error_uri ? err.error_uri : this.options.errorUri;
+                    r = err;
+                }
+
                 r.state = state;
 
-                if (err) {
-                    r.error_uri = r.error_uri ? r.error_uri : this.options.errorUri;
-                    delete r.status;
-                } else {
-                    res.header('Cache-Control', 'no-store');
-                }
-                res.redirect(buildRedirectURI(redirect_uri, {...r, state}));
+                res.redirect(buildRedirectURI(redirect_uri, r));
             }, scopes, user);
         };
     }
 
     /**
      * Assign this function to the 'token' endpoint.
+     * Recommended endpoint: /api/oauth/v2/token
      */
     public token(): ExpressMiddleware {
         function error(res: any, err: string, description: string): void {
@@ -207,15 +213,17 @@ export class AuthorizationServer {
                 return error(res, 'unsupported_grant_type', 'grant_type is not acceptable');
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+                res.header('Cache-Control', 'no-store')
+                    .status(err ? err.status || 400 : 200);
+
+                let r = response;
                 if (err) {
-                    res.status(err.status || 400);
                     delete err.status;
                     err.error_uri = err.error_uri ? err.error_uri : this.options.errorUri;
-                    res.json(err);
-                    return;
+                    r = err;
                 }
 
-                res.status(200).header('Cache-Control', 'no-store').json(response);
+                res.json(r);
             }, undefined, undefined);
         };
     }
@@ -281,6 +289,7 @@ export class AuthorizationServer {
      * Assign this function to the 'introspection' endpoint.
      * This endpoint is meant to be accessible only by the resource servers, if you make this endpoint
      * public make sure to verify the client on your own before the request reach this function.
+     * Recommended endpoint: /api/oauth/v2/introspection
      */
     public introspection(): ExpressMiddleware {
         const inactive = (res): void => {
@@ -313,7 +322,8 @@ export class AuthorizationServer {
                 scope: payload.scopes.join(this.options.scopeDelimiter),
                 client_id: payload.client_id,
                 user: payload.user,
-                exp: payload.exp
+                exp: payload.exp,
+                token_type: 'Bearer'
             });
         }
     }

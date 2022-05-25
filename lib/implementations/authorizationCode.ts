@@ -1,10 +1,30 @@
-import {Implementation} from "../../components/implementation";
-import {generateARTokens, signToken, verifyToken} from "../tokenUtils";
-import {codeChallengeHash, defaultOpts} from "../utils";
-import {AuthorizationCodeOptions} from "../../components/options/implementations/authorizationCodeOptions";
+import {Implementation} from "../components/implementation";
+import {generateARTokens, signToken, verifyToken} from "../modules/tokenUtils";
+import {codeChallengeHash, defaultCommonOpts} from "../modules/utils";
+import {AuthorizationCodeOptions} from "../components/options/implementations/authorizationCodeOptions";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
-    let opts: AuthorizationCodeOptions = defaultOpts(options, 'authorization-code');
+    let opts = {...options, ...defaultCommonOpts(options)};
+
+    if(typeof opts.usePKCE !== 'boolean')
+        opts.usePKCE = true;
+    if(typeof opts.allowCodeChallengeMethodPlain !== 'boolean')
+        opts.allowCodeChallengeMethodPlain = false;
+
+    if (typeof opts.authorizationCodeLifetime !== 'number')
+        opts.authorizationCodeLifetime = 60;
+    else if (opts.authorizationCodeLifetime <= 0 || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
+        throw new Error('authorizationCodeLifetime is not positive integer.');
+
+    if(typeof opts.saveAuthorizationCode !== 'function')
+        throw new Error('saveAuthorizationCode is not a function');
+
+    if(typeof opts.getAuthorizationCode !== 'function')
+        throw new Error('getAuthorizationCode is not a function');
+
+    if(typeof opts.deleteAuthorizationCode !== 'function')
+        throw new Error('deleteAuthorizationCode is not a function');
+
     return [
         {
             name: 'authorization-code',

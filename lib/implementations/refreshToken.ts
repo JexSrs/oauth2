@@ -1,10 +1,16 @@
-import {Implementation} from "../../components/implementation";
-import {generateARTokens, verifyToken} from "../tokenUtils";
-import {RefreshTokenOptions} from "../../components/options/implementations/refreshTokenOptions";
-import {defaultOpts} from "../utils";
+import {Implementation} from "../components/implementation";
+import {generateARTokens, verifyToken} from "../modules/tokenUtils";
+import {RefreshTokenOptions} from "../components/options/implementations/refreshTokenOptions";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
-    let opts: RefreshTokenOptions = defaultOpts(options, 'refresh-token');
+    let opts = {...options, ...defaultCommonOpts(options)};
+
+    if(typeof opts.getRefreshToken !== 'function')
+        throw new Error('getRefreshToken is not a function');
+    if(typeof opts.deleteTokens !== 'function')
+        throw new Error('deleteTokens is not a function');
+
     return {
         name: 'refresh-token',
         endpoint: 'token',

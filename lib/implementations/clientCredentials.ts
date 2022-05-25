@@ -1,10 +1,10 @@
-import {Implementation} from "../../components/implementation";
-import {generateARTokens} from "../tokenUtils";
-import {ClientCredentialsOptions} from "../../components/options/implementations/clientCredentialsOptions";
-import {defaultOpts} from "../utils";
+import {Implementation} from "../components/implementation";
+import {generateARTokens} from "../modules/tokenUtils";
+import {ClientCredentialsOptions} from "../components/options/implementations/clientCredentialsOptions";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function clientCredentials(options: ClientCredentialsOptions): Implementation {
-    let opts: ClientCredentialsOptions = defaultOpts(options, 'client-credentials');
+    let opts = {...options, ...defaultCommonOpts(options)};
     return {
         name: 'client-credentials',
         endpoint: 'token',

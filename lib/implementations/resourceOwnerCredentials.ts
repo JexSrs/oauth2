@@ -1,10 +1,14 @@
-import {Implementation} from "../../components/implementation";
-import {generateARTokens} from "../tokenUtils";
-import {ResourceOwnerCredentialsOptions} from "../../components/options/implementations/resourceOwnerCredentialsOptions";
-import {defaultOpts} from "../utils";
+import {Implementation} from "../components/implementation";
+import {generateARTokens} from "../modules/tokenUtils";
+import {ResourceOwnerCredentialsOptions} from "../components/options/implementations/resourceOwnerCredentialsOptions";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOptions): Implementation {
-    let opts: ResourceOwnerCredentialsOptions = defaultOpts(options, 'resource-owner-credentials');
+    let opts = {...options, ...defaultCommonOpts(options)};
+
+    if(typeof opts.validateUser !== 'function')
+        throw new Error('validateUser is not a function');
+
     return {
         name: 'resource-owner-credentials',
         endpoint: 'token',
