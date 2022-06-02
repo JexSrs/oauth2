@@ -8,13 +8,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
     if(opts.usePKCE === undefined)
         opts.usePKCE = true;
-    else if(typeof opts.usePKCE !== 'boolean')
-        throw new Error('usePKCE must be type boolean')
 
     if(opts.allowCodeChallengeMethodPlain === undefined)
         opts.allowCodeChallengeMethodPlain = true
-    else if(typeof opts.allowCodeChallengeMethodPlain !== 'boolean')
-        throw new Error('allowCodeChallengeMethodPlain must be type boolean')
 
     if(opts.authorizationCodeLifetime === undefined)
         opts.authorizationCodeLifetime = 60;

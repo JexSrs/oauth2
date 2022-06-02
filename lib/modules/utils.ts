@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import {OAuth2Error} from "../components/types";
 
 export function buildRedirectURI(redirectURI: string, params: { [key: string]: string | undefined }): string {
     let r = `${redirectURI}?`;
@@ -45,4 +46,29 @@ export function randStr(length: number): string {
         (v, k) => chars[Math.floor(Math.random() * chars.length)]
     );
     return randomArray.join("");
+}
+
+export function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; status?: number; cache?: boolean }) {
+    let wwwAuthHeader = `Bearer error=${data.error}`;
+    if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
+    if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
+
+    let resp: any = {
+        error: data.error,
+        error_description: data.error_description,
+        error_uri: data.error_uri,
+    };
+
+    if(data.state != undefined)
+        resp.state = data.state;
+
+    if(!data.cache)
+        res.header('Cache-Control', 'no-store')
+
+    res.header('WWW-Authenticate', wwwAuthHeader)
+
+    if (data.redirect_uri)
+        res.redirect(buildRedirectURI(data.redirect_uri, resp));
+    else
+        res.status(data.status || 400).json(resp)
 }

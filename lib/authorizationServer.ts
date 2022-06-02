@@ -1,5 +1,5 @@
 import {ExpressMiddleware, OAuth2Error} from "./components/types";
-import {buildRedirectURI, isEmbeddedWebView} from "./modules/utils";
+import {buildRedirectURI, error, isEmbeddedWebView} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
@@ -121,27 +121,6 @@ export class AuthorizationServer {
      * Recommended endpoint: GET /api/oauth/v2/authorize
      */
     public authorize(): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; }) {
-            let wwwAuthHeader = `Bearer error=${data.error}`;
-            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
-            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
-
-            let resp = {
-                error: data.error,
-                error_description: data.error_description,
-                error_uri: data.error_uri,
-                state: data.state
-            };
-
-            res.header('Cache-Control', 'no-store')
-                .header('WWW-Authenticate', wwwAuthHeader)
-
-            if (data.redirect_uri)
-                res.redirect(buildRedirectURI(data.redirect_uri, resp));
-            else
-                res.json(resp)
-        }
-
         return async (req, res, next) => {
             if (req.method !== 'GET') {
                 res.status(405).end('Method not allowed.');
@@ -174,13 +153,12 @@ export class AuthorizationServer {
                     error: 'invalid_request',
                     error_description: 'Redirect URI is not registered',
                     error_uri: this.options.errorUri,
-                })
+                });
 
             // Server is temporary unavailable
             if ((typeof this.options.isTemporaryUnavailable === 'boolean' || typeof this.options.isTemporaryUnavailable === 'undefined'
                 ? this.options.isTemporaryUnavailable
-                : await this.options.isTemporaryUnavailable(req))
-            )
+                : await this.options.isTemporaryUnavailable(req)))
                 return error(res, {
                     error: 'temporary_unavailable',
                     error_description: 'The authorization server is temporary unavailable',
@@ -262,20 +240,6 @@ export class AuthorizationServer {
      * Recommended endpoint: POST /api/oauth/v2/token
      */
     public token(): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & { status?: number }) {
-            let wwwAuthHeader = `Bearer error=${data.error}`;
-            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
-            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
-
-            res.status(data.status || 400)
-                .header('WWW-Authenticate', wwwAuthHeader)
-                .json({
-                    error: data.error,
-                    error_description: data.error_description,
-                    error_uri: data.error_uri
-                });
-        }
-
         return async (req, res, next) => {
             if (req.method !== 'POST') {
                 res.status(405).end('Method not allowed.');
@@ -317,20 +281,6 @@ export class AuthorizationServer {
      * Recommended endpoint: POST /api/oauth/v2/device
      */
     public device(): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & { status?: number }) {
-            let wwwAuthHeader = `Bearer error=${data.error}`;
-            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
-            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
-
-            res.status(data.status || 400)
-                .header('WWW-Authenticate', wwwAuthHeader)
-                .json({
-                    error: data.error,
-                    error_description: data.error_description,
-                    error_uri: data.error_uri
-                });
-        }
-
         return async (req, res, next) => {
             if (req.method !== 'POST') {
                 res.status(405).end('Method not allowed.');
@@ -375,20 +325,6 @@ export class AuthorizationServer {
      *              check will be omitted.
      */
     public authenticate(scope?: string | string[]): ExpressMiddleware {
-        function error(res: any, data: OAuth2Error & { status?: number }): void {
-            let wwwAuthHeader = `Bearer error=${data.error}`;
-            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
-            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
-
-            res.status(data.status || 400)
-                .header('WWW-Authenticate', wwwAuthHeader)
-                .json({
-                    error: data.error,
-                    error_description: data.error_description,
-                    error_uri: data.error_uri
-                });
-        }
-
         let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
             let token = this.options.getToken!(req);
@@ -396,7 +332,8 @@ export class AuthorizationServer {
                 return error(res, {
                     error: 'invalid_request',
                     error_description: 'No access token was provided',
-                    error_uri: this.options.errorUri
+                    error_uri: this.options.errorUri,
+                    cache: true
                 });
 
             let payload: any = verifyToken(token, this.options.secret);
@@ -405,7 +342,8 @@ export class AuthorizationServer {
                     error: 'invalid_token',
                     error_description: 'The access token has expired',
                     error_uri: this.options.errorUri,
-                    status: 401
+                    status: 401,
+                    cache: true
                 });
 
             if (scopes && payload.scopes.some((v: string) => !scopes!.includes(v)))
@@ -413,7 +351,8 @@ export class AuthorizationServer {
                     error: 'insufficient_scope',
                     error_description: 'Client does not have access to this endpoint',
                     error_uri: this.options.errorUri,
-                    status: 403
+                    status: 403,
+                    cache: true
                 });
 
             let dbToken = await this.options.getAccessToken({
@@ -427,7 +366,8 @@ export class AuthorizationServer {
                     error: 'invalid_token',
                     error_description: 'The access token has expired',
                     error_uri: this.options.errorUri,
-                    status: 401
+                    status: 401,
+                    cache: true
                 });
 
             this.options.setPayloadLocation(req, {
