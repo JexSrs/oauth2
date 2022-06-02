@@ -6,14 +6,21 @@ import {AuthorizationCodeOptions} from "../components/options/implementations/au
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
     let opts = {...options, ...defaultCommonOpts(options)};
 
-    if(typeof opts.usePKCE !== 'boolean')
+    if(opts.usePKCE === undefined)
         opts.usePKCE = true;
-    if(typeof opts.allowCodeChallengeMethodPlain !== 'boolean')
-        opts.allowCodeChallengeMethodPlain = false;
+    else if(typeof opts.usePKCE !== 'boolean')
+        throw new Error('usePKCE must be type boolean')
 
-    if (typeof opts.authorizationCodeLifetime !== 'number')
+    if(opts.allowCodeChallengeMethodPlain === undefined)
+        opts.allowCodeChallengeMethodPlain = true
+    else if(typeof opts.allowCodeChallengeMethodPlain !== 'boolean')
+        throw new Error('allowCodeChallengeMethodPlain must be type boolean')
+
+    if(opts.authorizationCodeLifetime === undefined)
         opts.authorizationCodeLifetime = 60;
-    else if (opts.authorizationCodeLifetime <= 0 || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
+    else if (typeof opts.authorizationCodeLifetime !== 'number'
+        || opts.authorizationCodeLifetime <= 0
+        || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
         throw new Error('authorizationCodeLifetime is not positive integer.');
 
     if(typeof opts.saveAuthorizationCode !== 'function')

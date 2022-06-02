@@ -313,6 +313,61 @@ export class AuthorizationServer {
     }
 
     /**
+     * Assign this function to the 'device' endpoint with POST method.
+     * Recommended endpoint: POST /api/oauth/v2/device
+     */
+    public device(): ExpressMiddleware {
+        function error(res: any, data: OAuth2Error & { status?: number }) {
+            let wwwAuthHeader = `Bearer error=${data.error}`;
+            if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
+            if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
+
+            res.status(data.status || 400)
+                .header('WWW-Authenticate', wwwAuthHeader)
+                .json({
+                    error: data.error,
+                    error_description: data.error_description,
+                    error_uri: data.error_uri
+                });
+        }
+
+        return async (req, res, next) => {
+            if (req.method !== 'POST') {
+                res.status(405).end('Method not allowed.');
+                return;
+            }
+
+            const {grant_type} = req.body;
+
+            if (!grant_type)
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'Query parameter grant_type is missing'
+                });
+
+            let imp = this.implementations.find(imp => imp.endpoint === 'device' && imp.matchType === grant_type);
+            if (!imp)
+                return error(res, {
+                    error: 'unsupported_grant_type',
+                    error_description: `Grant type ${grant_type} is not supported`,
+                    error_uri: this.options.errorUri
+                });
+
+            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+                if (err)
+                    return error(res, {
+                        error: err.error,
+                        error_description: err.error_description,
+                        error_uri: err.error_uri ? err.error_uri : this.options.errorUri,
+                        status: err.status
+                    });
+
+                res.header('Cache-Control', 'no-store').status(200).json(response);
+            }, undefined, undefined);
+        };
+    }
+
+    /**
      * This function will be used to authenticate a request if the resource and authorization server
      * are one and the same. If they are different checkout the introspection endpoint.
      * @param scope The scopes needed for this request. If the access token scopes are insufficient

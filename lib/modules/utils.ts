@@ -38,3 +38,11 @@ export function defaultCommonOpts(options: any) {
 
     return opts;
 }
+
+export function randStr(length: number): string {
+    const chars = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890";
+    const randomArray = Array.from({ length: length },
+        (v, k) => chars[Math.floor(Math.random() * chars.length)]
+    );
+    return randomArray.join("");
+}

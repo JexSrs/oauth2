@@ -3,7 +3,7 @@ export type ExpressMiddleware = (req: any, res: any, next: any) => void;
 export type ARTokens = {
     access_token: string;
     token_type: string;
-    expires_in: number;
+    expires_in?: number;
     refresh_token?: string;
     scope: string;
 };
@@ -16,7 +16,7 @@ export type OAuth2Error = {
 
 export type THTokenSave = {
     accessToken: string;
-    accessTokenExpiresAt: number;
+    accessTokenExpiresAt?: number;
     refreshToken?: string;
     refreshTokenExpiresAt?: number;
     clientId: string;
@@ -51,4 +51,19 @@ export type THRefreshTokenAsk = {
     refreshToken: string;
     clientId: string;
     user: string;
+};
+
+export type DFCodeSave = {
+    clientId: string;
+    deviceCode: string;
+    userCode: string;
+    interval: number;
+    expiresAt: number;
+    scopes: string[];
+    status: 'pending' | 'completed'
+};
+
+export type DFCodeAsk = {
+    clientId: string;
+    deviceCode: string;
 };

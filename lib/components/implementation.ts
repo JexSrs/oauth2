@@ -11,6 +11,7 @@ export interface Implementation {
      * The endpoint where the implementation will be accessed.
      * * authorize: The user will need to authorize the request before reaching the implementation.
      * * token: There is no user interaction, or the user has provided their credentials to the client.
+     * * device: There is no user interaction, this endpoint will be used for the device flow.
      *
      * During authorization the following checks will be made:
      * * validateRedirectURI
@@ -19,9 +20,9 @@ export interface Implementation {
      * * isGrantTypeAllowed
      * * isScopesValid
      */
-    endpoint: 'authorize' | 'token';
+    endpoint: 'authorize' | 'token' | 'device';
     /**
-     * The response_type (for endpoint 'authorize') or grant_type (for endpoint 'token') that the client has to
+     * The response_type (for endpoint 'authorize') or grant_type (for endpoint 'token' and 'device') that the client has to
      * match to access the implementation.
      */
     matchType: string;
