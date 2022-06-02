@@ -63,9 +63,7 @@ export type AuthorizationServerOptions = {
      * @param req The request instance.
      * @return {object} The client_id and client_secret.
      */
-    getClientCredentials?: 'http-basic-auth-header' | 'body' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
-
-
+    getClientCredentials?: 'header' | 'body' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
     /**
      * Validate that the redirect uri that was passed during authorization is
      * registered matches the client's redirect uris.

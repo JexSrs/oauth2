@@ -38,10 +38,14 @@ export async function generateARTokens(payload: object, client_id: string, scope
     if (issueRefreshToken && opts.accessTokenLifetime != null)
         refreshToken = signToken(refreshTokenPayload, opts.secret, opts.refreshTokenLifetime ?? undefined);
 
+    let expires_in = undefined;
+    if(opts.accessTokenLifetime != null)
+        expires_in = opts.accessTokenLifetime;
+
     return {
         access_token: accessToken,
         token_type: 'Bearer',
-        expires_in: opts.accessTokenLifetime != null ? opts.accessTokenLifetime : undefined,
+        expires_in,
         refresh_token: refreshToken,
         scope: scopes.join(opts.scopeDelimiter)
     };

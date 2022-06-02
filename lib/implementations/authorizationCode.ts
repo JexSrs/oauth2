@@ -1,6 +1,6 @@
 import {Implementation} from "../components/implementation";
 import {generateARTokens, signToken, verifyToken} from "../modules/tokenUtils";
-import {codeChallengeHash, defaultCommonOpts} from "../modules/utils";
+import {codeChallengeHash, defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
 import {AuthorizationCodeOptions} from "../components/options/implementations/authorizationCodeOptions";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
@@ -67,12 +67,13 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     authorizationCode: code,
                     expiresAt: Math.trunc((Date.now() + opts.authorizationCodeLifetime * 1000) / 1000),
                     clientId: client_id,
-                    redirectUri: redirect_uri,
+                    scopes: scopes!,
                     user,
-                    scopes,
+                    redirectUri: redirect_uri,
                     codeChallenge: code_challenge,
                     codeChallengeMethod: code_challenge_method
                 });
+
                 if(!dbRes)
                     return callback(undefined, {
                         error: 'server_error',
@@ -176,9 +177,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 // Database save
                 let dbRes = await serverOpts.saveTokens({
                     accessToken: tokens.access_token,
-                    accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
+                    accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
                     refreshToken: tokens.refresh_token,
-                    refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
+                    refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
                     clientId: client_id,
                     user: dbCode.user,
                     scopes: dbCode.scopes,

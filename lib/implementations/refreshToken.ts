@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
 import {generateARTokens, verifyToken} from "../modules/tokenUtils";
 import {RefreshTokenOptions} from "../components/options/implementations/refreshTokenOptions";
-import {defaultCommonOpts} from "../modules/utils";
+import {defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
     let opts = {...options, ...defaultCommonOpts(options)};
@@ -92,9 +92,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             // Database save
             let dbRes = await serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
+                accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
                 refreshToken: tokens.refresh_token,
-                refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
+                refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
                 clientId: client_id,
                 user: refreshTokenPayload.user,
                 scopes,

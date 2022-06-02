@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
 import {generateARTokens, signToken, verifyToken} from "../modules/tokenUtils";
 import {DeviceFlowOptions} from "../components/options/implementations/deviceFlowOptions";
-import {randStr} from "../modules/utils";
+import {getTokenExpiresAt, randStr} from "../modules/utils";
 
 export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
     let opts = {...options};
@@ -122,6 +122,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                         return callback(undefined, {error: 'slow_down', status: 400});
                 }
 
+                // The signed JWT is internal and will never go to any user or client
                 const bucket = signToken({deviceCode: device_code}, serverOpts.secret, opts.interval);
                 await opts.saveBucket(device_code, bucket, opts.interval!);
 
@@ -172,9 +173,9 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 // Database save
                 let dbRes = await serverOpts.saveTokens({
                     accessToken: tokens.access_token,
-                    accessTokenExpiresAt: tokens.expires_in ? Math.trunc((Date.now() + serverOpts.accessTokenLifetime! * 1000) / 1000) : undefined,
+                    accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
                     refreshToken: tokens.refresh_token,
-                    refreshTokenExpiresAt: tokens.refresh_token ? Math.trunc((Date.now() + serverOpts.refreshTokenLifetime! * 1000) / 1000) : undefined,
+                    refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
                     clientId: client_id,
                     user,
                     scopes: dbDev.scopes,

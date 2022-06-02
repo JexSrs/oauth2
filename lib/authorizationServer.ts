@@ -17,8 +17,6 @@ export class AuthorizationServer {
 
     // TODO - https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 
-    // TODO - Add a custom function that will do extra checks the user wants.
-
     // TODO - Add checks for scopes when authorizing client (client may not be allowed to access specific scopes)
 
     // TODO - Add option to do all checks asynchronous with Promise.all([w1, w2, w3]).spread(function (r1, r2, r3) {})
@@ -64,7 +62,7 @@ export class AuthorizationServer {
         if (typeof opts.scopeDelimiter === 'undefined')
             opts.scopeDelimiter = ' ';
 
-        if(opts.getClientCredentials === 'http-basic-auth-header')
+        if(opts.getClientCredentials === 'header')
             opts.getClientCredentials = (req: any) => {
                 let authHeader = req.headers['authorization'];
                 let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';

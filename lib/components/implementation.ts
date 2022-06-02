@@ -37,7 +37,7 @@ export interface Implementation {
      */
     function: (
         req: any,
-        serverOpts: AuthorizationServerOptions,
+        serverOpts: Required<AuthorizationServerOptions>,
         issueRefreshToken: boolean,
         callback: (response?: object, err?: OAuth2Error & {status?: number; } & object) => void,
         scopes: string[] | undefined,

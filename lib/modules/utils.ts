@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import {OAuth2Error} from "../components/types";
+import {ARTokens, OAuth2Error} from "../components/types";
 
 export function buildRedirectURI(redirectURI: string, params: { [key: string]: string | undefined }): string {
     let r = `${redirectURI}?`;
@@ -71,4 +71,9 @@ export function error(res: any, data: OAuth2Error & { redirect_uri?: string; sta
         res.redirect(buildRedirectURI(data.redirect_uri, resp));
     else
         res.status(data.status || 400).json(resp)
+}
+
+export function getTokenExpiresAt(tokens: ARTokens, lifetime: number, type: 'access' | 'refresh'): number | undefined {
+    if((type == 'access' && tokens.expires_in) || (type === 'access' && tokens.refresh_token))
+        return Math.trunc((Date.now() + lifetime * 1000) / 1000);
 }
