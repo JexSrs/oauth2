@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens} from "../modules/tokenUtils";
+import {generateARTokens, getTokenExpiresAt} from "../modules/tokenUtils";
 import {ResourceOwnerCredentialsOptions} from "../components/options/implementations/resourceOwnerCredentialsOptions";
-import {defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOptions): Implementation {
     let opts = {...options, ...defaultCommonOpts(options)};

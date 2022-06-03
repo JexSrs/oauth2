@@ -1,6 +1,5 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens} from "../modules/tokenUtils";
-import {getTokenExpiresAt} from "../modules/utils";
+import {generateARTokens, getTokenExpiresAt} from "../modules/tokenUtils";
 
 export function implicit(): Implementation {
     return {

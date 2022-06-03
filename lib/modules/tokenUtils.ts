@@ -50,3 +50,8 @@ export async function generateARTokens(payload: object, client_id: string, scope
         scope: scopes.join(opts.scopeDelimiter)
     };
 }
+
+export function getTokenExpiresAt(tokens: ARTokens, lifetime: number, type: 'access' | 'refresh'): number | undefined {
+    if((type == 'access' && tokens.expires_in) || (type === 'access' && tokens.refresh_token))
+        return Math.trunc((Date.now() + lifetime * 1000) / 1000);
+}

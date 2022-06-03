@@ -83,10 +83,14 @@ export type AuthorizationServerOptions = {
     /**
      * A function that asks if the passed scopes are valid. Not if permitted, this will be handled by the user.
      * If no scopes where send with the request then this function will be called once with an empty array.
+     *
+     * This function will only validate the scopes. If you want to check if client or user is allowed
+     * to use a specific scope, then it can be checked before authorization at previous middleware
+     * by parsing and checking scopes.
      * @param scopes
      * @return {boolean} True if scopes are valid, false otherwise.
      */
-    isScopesValid: (scopes: string[]) => (Promise<boolean> | boolean);
+    isScopesValid: (scopes: string[]) => Promise<boolean> | boolean;
     /**
      * The token secret that will be used to sign the tokens using JSONWebToken (JWT).
      */

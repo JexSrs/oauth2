@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens} from "../modules/tokenUtils";
+import {generateARTokens, getTokenExpiresAt} from "../modules/tokenUtils";
 import {ClientCredentialsOptions} from "../components/options/implementations/clientCredentialsOptions";
-import {defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function clientCredentials(options: ClientCredentialsOptions): Implementation {
     let opts = {...options, ...defaultCommonOpts(options)};

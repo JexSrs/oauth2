@@ -1,6 +1,6 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens, signToken, verifyToken} from "../modules/tokenUtils";
-import {codeChallengeHash, defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
+import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
+import {codeChallengeHash, defaultCommonOpts} from "../modules/utils";
 import {AuthorizationCodeOptions} from "../components/options/implementations/authorizationCodeOptions";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
@@ -10,7 +10,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
         opts.usePKCE = true;
 
     if(opts.allowCodeChallengeMethodPlain === undefined)
-        opts.allowCodeChallengeMethodPlain = true
+        opts.allowCodeChallengeMethodPlain = false
 
     if(opts.authorizationCodeLifetime === undefined)
         opts.authorizationCodeLifetime = 60;
@@ -190,11 +190,6 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error'
                     });
-
-                // Generate ID token
-                let idToken = await opts.getIDTokenContent(dbCode.user);
-                if(idToken != null)
-                    (tokens as any)['id_token'] = signToken(idToken, serverOpts.secret);
 
                 // Respond with tokens
                 callback(tokens);

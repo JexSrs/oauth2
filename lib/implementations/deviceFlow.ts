@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens, signToken, verifyToken} from "../modules/tokenUtils";
+import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
 import {DeviceFlowOptions} from "../components/options/implementations/deviceFlowOptions";
-import {getTokenExpiresAt, randStr} from "../modules/utils";
+import {randStr} from "../modules/utils";
 
 export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
     let opts = {...options};

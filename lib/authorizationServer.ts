@@ -1,9 +1,11 @@
-import {ExpressMiddleware, OAuth2Error} from "./components/types";
+import {ExpressMiddleware} from "./components/types";
 import {buildRedirectURI, error, isEmbeddedWebView} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
-import Require = NodeJS.Require;
+
+// TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
+// TODO - Support to do all checks async using Promise.all([p1, p2, p3]).spread(function (r1, r2, r3) {})
 
 export class AuthorizationServer {
 
@@ -11,15 +13,6 @@ export class AuthorizationServer {
     //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
     //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
     //      - https://www.oauth.com/oauth2-servers/making-authenticated-requests/refreshing-an-access-token/
-
-    // TODO - Add a way to identify if scopes are valid with client_id & user_id (maybe pass req, that contains query and user)
-    //      - This also can be checked before authorization at previous middleware by parsing and checking scopes
-
-    // TODO - https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
-
-    // TODO - Add checks for scopes when authorizing client (client may not be allowed to access specific scopes)
-
-    // TODO - Add option to do all checks asynchronous with Promise.all([w1, w2, w3]).spread(function (r1, r2, r3) {})
 
     // TODO - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 
@@ -249,7 +242,7 @@ export class AuthorizationServer {
             if (!grant_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Query parameter grant_type is missing'
+                    error_description: 'Property grant_type is missing'
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
@@ -290,7 +283,7 @@ export class AuthorizationServer {
             if (!grant_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Query parameter grant_type is missing'
+                    error_description: 'Property grant_type is missing'
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'device' && imp.matchType === grant_type);
@@ -325,7 +318,7 @@ export class AuthorizationServer {
     public authenticate(scope?: string | string[]): ExpressMiddleware {
         let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
-            let token = this.options.getToken!(req);
+            let token = this.options.getToken(req);
             if (!token)
                 return error(res, {
                     error: 'invalid_request',
@@ -339,6 +332,15 @@ export class AuthorizationServer {
                 return error(res, {
                     error: 'invalid_token',
                     error_description: 'The access token has expired',
+                    error_uri: this.options.errorUri,
+                    status: 401,
+                    cache: true
+                });
+
+            if(payload.type !== 'access_token')
+                return error(res, {
+                    error: 'invalid_token',
+                    error_description: 'The token is not an access token',
                     error_uri: this.options.errorUri,
                     status: 401,
                     cache: true

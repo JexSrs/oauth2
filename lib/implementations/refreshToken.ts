@@ -1,7 +1,7 @@
 import {Implementation} from "../components/implementation";
-import {generateARTokens, verifyToken} from "../modules/tokenUtils";
+import {generateARTokens, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
 import {RefreshTokenOptions} from "../components/options/implementations/refreshTokenOptions";
-import {defaultCommonOpts, getTokenExpiresAt} from "../modules/utils";
+import {defaultCommonOpts} from "../modules/utils";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
     let opts = {...options, ...defaultCommonOpts(options)};
