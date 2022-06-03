@@ -6,15 +6,15 @@ import {AuthorizationServerOptions} from "./components/options/authorizationServ
 
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 // TODO - Support to do all checks async using Promise.all([p1, p2, p3]).spread(function (r1, r2, r3) {})
+// TODO - Support openid https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 
 export class AuthorizationServer {
 
     // TODO - add event listeners, maybe using .on(event, listener);
     //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
     //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
-    //      - https://www.oauth.com/oauth2-servers/making-authenticated-requests/refreshing-an-access-token/
 
-    // TODO - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
+    // TODO - Add more functions such as expireTokenForClient, expireAllTokensForClient, expire tokenForUser, expireAllTokensForUser etc.
 
     private readonly options: Required<AuthorizationServerOptions>;
     private readonly implementations: Implementation[] = [];
@@ -80,7 +80,7 @@ export class AuthorizationServer {
             if (!imp.name)
                 throw new Error('Implementation name is missing');
 
-            // Endppoint check
+            // Endpoint check
             if (imp.endpoint !== 'token' && imp.endpoint !== 'authorize')
                 throw new Error(`Implementation ${imp.name} has invalid endpoint`);
 

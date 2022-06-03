@@ -49,7 +49,7 @@ export function randStr(length: number): string {
 }
 
 export function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; status?: number; cache?: boolean }) {
-    let wwwAuthHeader = `Bearer error=${data.error}`;
+    let wwwAuthHeader = `Bearer error="${data.error}"`;
     if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
     if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
 

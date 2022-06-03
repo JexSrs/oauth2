@@ -84,10 +84,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             });
 
             // Generate new tokens
-            // If refresh token does not expire do not generate new refresh token
             let tokens = await generateARTokens({
                 user: refreshTokenPayload.user
-            }, client_id, scopes, serverOpts, refreshTokenPayload.exp != null);
+            }, client_id, scopes, serverOpts, true);
 
             // Database save
             let dbRes = await serverOpts.saveTokens({
