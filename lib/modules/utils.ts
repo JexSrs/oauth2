@@ -48,7 +48,7 @@ export function randStr(length: number): string {
     return randomArray.join("");
 }
 
-export function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; status?: number; cache?: boolean }) {
+export function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; status?: number; noCache?: boolean }) {
     let wwwAuthHeader = `Bearer error="${data.error}"`;
     if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;
     if (data.error_uri) wwwAuthHeader += ` error_uri="${data.error_uri}"`;
@@ -62,7 +62,7 @@ export function error(res: any, data: OAuth2Error & { redirect_uri?: string; sta
     if(data.state != undefined)
         resp.state = data.state;
 
-    if(!data.cache)
+    if(data.noCache == undefined || data.noCache)
         res.header('Cache-Control', 'no-store')
 
     res.header('WWW-Authenticate', wwwAuthHeader)
@@ -72,4 +72,3 @@ export function error(res: any, data: OAuth2Error & { redirect_uri?: string; sta
     else
         res.status(data.status || 400).json(resp)
 }
-

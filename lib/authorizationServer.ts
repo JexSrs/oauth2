@@ -9,10 +9,9 @@ import {Events} from "./components/events";
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 // TODO - Support to do all checks async using Promise.all([p1, p2, p3]).spread(function (r1, r2, r3) {})
 // TODO - Support openid https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
+// TODO - Add more functions such as expireTokenForClient, expireAllTokensForClient, expire tokenForUser, expireAllTokensForUser etc.
 
 export class AuthorizationServer {
-
-    // TODO - Add more functions such as expireTokenForClient, expireAllTokensForClient, expire tokenForUser, expireAllTokensForUser etc.
 
     private readonly options: Required<AuthorizationServerOptions>;
     private issueRefreshToken: boolean = false;
@@ -361,7 +360,7 @@ export class AuthorizationServer {
                     error: 'invalid_request',
                     error_description: 'No access token was provided',
                     error_uri: this.options.errorUri,
-                    cache: true
+                    noCache: false
                 });
             }
 
@@ -373,7 +372,7 @@ export class AuthorizationServer {
                     error_description: 'The access token has expired',
                     error_uri: this.options.errorUri,
                     status: 401,
-                    cache: true
+                    noCache: false
                 });
             }
 
@@ -384,7 +383,7 @@ export class AuthorizationServer {
                     error_description: 'The token is not an access token',
                     error_uri: this.options.errorUri,
                     status: 401,
-                    cache: true
+                    noCache: false
                 });
             }
 
@@ -395,7 +394,7 @@ export class AuthorizationServer {
                     error_description: 'Client does not have access to this endpoint',
                     error_uri: this.options.errorUri,
                     status: 403,
-                    cache: true
+                    noCache: false
                 });
             }
 
@@ -412,7 +411,7 @@ export class AuthorizationServer {
                     error_description: 'The access token has expired',
                     error_uri: this.options.errorUri,
                     status: 401,
-                    cache: true
+                    noCache: false
                 });
             }
 
