@@ -2,6 +2,7 @@ import {Implementation} from "../components/implementation";
 import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
 import {DeviceFlowOptions} from "../components/options/implementations/deviceFlowOptions";
 import {randStr} from "../modules/utils";
+import {Events} from "../components/events";
 
 export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
     let opts = {...options};
@@ -42,7 +43,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
             name: 'device-flow',
             endpoint: 'device',
             matchType: 'token',
-            function: async (req, serverOpts, issueRefreshToken, callback) => {
+            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
                 const {client_id, scope} = req.body;
 
                 if(!client_id)
@@ -52,17 +53,21 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                     });
 
                 let scopes = scope?.split(serverOpts.scopeDelimiter) || [];
-                if (!(await serverOpts.isScopesValid(scopes)))
+                if (!(await serverOpts.isScopesValid(scopes))) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_SCOPES_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_scope',
                         error_description: 'One or more scopes are not acceptable'
                     });
+                }
 
-                if(!(await opts.validateClient(client_id)))
+                if(!(await opts.validateClient(client_id))) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_CLIENT_INVALID, req);
                     return callback(undefined, {
                         error: 'unauthorized_client',
                         error_description: 'Client authentication failed'
                     });
+                }
 
                 let deviceCode = await opts.deviceCodeGenerator!(client_id);
                 let userCode = await opts.userCodeGenerator!(client_id);
@@ -77,11 +82,13 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                     status: 'pending'
                 });
 
-                if(!dbRes)
+                if(!dbRes) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_SAVE_ERROR, req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error'
                     });
+                }
 
                 callback({
                     device_code: deviceCode,
@@ -96,7 +103,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
             name: 'device-flow',
             endpoint: 'token',
             matchType: 'urn:ietf:params:oauth:grant-type:device_code',
-            function: async (req, serverOpts, issueRefreshToken, callback) => {
+            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
                 let {client_id, device_code} = req.body;
 
                 if(!client_id)
@@ -118,8 +125,10 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 const oldBucket = await opts.getBucket(device_code);
                 if(oldBucket != null) {
                     const payload = verifyToken(oldBucket, serverOpts.secret);
-                    if(payload !== null)
+                    if(payload !== null) {
+                        eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_SLOW_DOWN, req);
                         return callback(undefined, {error: 'slow_down', status: 400});
+                    }
                 }
 
                 // The signed JWT is internal and will never go to any user or client
@@ -132,12 +141,14 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                     clientId: client_id
                 });
 
-                if(!dbDev || (dbDev.status !== 'pending' && dbDev.status !== 'completed'))
+                if(!dbDev || (dbDev.status !== 'pending' && dbDev.status !== 'completed')) {
+                    eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_DEVICE_CODE_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'Device code not found',
                         status: 400
                     });
+                }
 
                 if(dbDev.expiresAt > Math.trunc(Date.now() / 1000)) {
                     if(opts.removeOnExpired)
@@ -145,11 +156,15 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                             clientId: client_id,
                             deviceCode: device_code
                         });
+
+                    eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_EXPIRED, req);
                     return callback(undefined, {error: 'expired_token', status: 400});
                 }
 
-                if(dbDev.status === 'pending')
+                if(dbDev.status === 'pending') {
+                    eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_PENDING, req);
                     return callback(undefined, {error: 'authorization_pending', status: 400});
+                }
 
                 // Request completed - Get user if authorized
                 let user = await opts.getUser(dbDev.deviceCode, dbDev.userCode);
@@ -159,6 +174,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                             clientId: client_id,
                             deviceCode: device_code
                         });
+                    eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_ACCESS_DENIED, req);
                     return callback(undefined, {error: 'access_denied', status: 400});
                 }
 
@@ -181,11 +197,13 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                     scopes: dbDev.scopes,
                 });
 
-                if(!dbRes)
+                if(!dbRes) {
+                    eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_SAVE_ERROR, req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error'
                     });
+                }
 
                 callback(tokens);
             }

@@ -1,12 +1,13 @@
 import {Implementation} from "../components/implementation";
 import {generateARTokens, getTokenExpiresAt} from "../modules/tokenUtils";
+import {Events} from "../components/events";
 
 export function implicit(): Implementation {
     return {
         name: 'authorization-code',
         endpoint: 'authorize',
         matchType: 'token',
-        function: async (req, serverOpts, issueRefreshToken, callback, scopes, user) => {
+        function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter, scopes, user) => {
             let {client_id} = req.query;
 
             // Generate access token
@@ -21,11 +22,13 @@ export function implicit(): Implementation {
                 scopes: scopes!,
             });
 
-            if(!dbRes)
+            if(!dbRes) {
+                eventEmitter.emit(Events.AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR, req);
                 return callback(undefined, {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error'
                 });
+            }
 
             callback(tokens);
         }

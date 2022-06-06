@@ -1,5 +1,7 @@
 import {OAuth2Error} from "./types";
 import {AuthorizationServerOptions} from "./options/authorizationServerOptions";
+import EventEmitter from "events";
+
 
 export interface Implementation {
     /**
@@ -40,6 +42,7 @@ export interface Implementation {
         serverOpts: Required<AuthorizationServerOptions>,
         issueRefreshToken: boolean,
         callback: (response?: object, err?: OAuth2Error & {status?: number; } & object) => void,
+        eventEmitter: EventEmitter,
         scopes: string[] | undefined,
         user: any | undefined,
     ) => void | Promise<void>;

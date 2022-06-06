@@ -3,6 +3,8 @@ import {buildRedirectURI, error, isEmbeddedWebView} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
+import EventEmitter from "events";
+import {Events} from "./components/events";
 
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 // TODO - Support to do all checks async using Promise.all([p1, p2, p3]).spread(function (r1, r2, r3) {})
@@ -10,16 +12,20 @@ import {AuthorizationServerOptions} from "./components/options/authorizationServ
 
 export class AuthorizationServer {
 
-    // TODO - add event listeners, maybe using .on(event, listener);
-    //      - Add listener for invalid refreshToken to check if token is stolen etc (for clients without a secret)
-    //      - Add listener if authorization code is used twice (it should be treated as an attack and if possible revoke tokens)
-
     // TODO - Add more functions such as expireTokenForClient, expireAllTokensForClient, expire tokenForUser, expireAllTokensForUser etc.
 
     private readonly options: Required<AuthorizationServerOptions>;
-    private readonly implementations: Implementation[] = [];
     private issueRefreshToken: boolean = false;
 
+    private readonly implementations: Implementation[] = [];
+    private readonly eventEmitter = new EventEmitter();
+
+    /**
+     * Construct a new AuthorizationServer to handle your oauth2 requests.
+     * In case you want different options for each oauth2 flow, it is recommended
+     * to construct different classes with different options.
+     * @param options
+     */
     constructor(options: AuthorizationServerOptions) {
         let opts: AuthorizationServerOptions = {...options};
 
@@ -72,6 +78,10 @@ export class AuthorizationServer {
         this.options = opts as Required<AuthorizationServerOptions>;
     }
 
+    /**
+     * Register a new implementation.
+     * @param implementation
+     */
     public use(implementation: Implementation | Implementation[]): AuthorizationServer {
         let imps = Array.isArray(implementation) ? implementation : [implementation];
 
@@ -108,6 +118,17 @@ export class AuthorizationServer {
     }
 
     /**
+     * By using the eventEmitter of Node.JS, events will be emitted.
+     * Each event will be accompanied by the request instance of the server.
+     * Careful, because this might expose confidential data, such as the client_id or client_secret.
+     * @param event
+     * @param listener
+     */
+    public on(event: string, listener: (...args: any[]) => void) {
+        this.eventEmitter.on(event, listener);
+    }
+
+    /**
      * Assign this function to the 'authorize' endpoint with GET method.
      * Recommended endpoint: GET /api/oauth/v2/authorize
      */
@@ -139,12 +160,14 @@ export class AuthorizationServer {
                 });
 
             // Validate client_id and redirect_uri
-            if (!(await this.options.validateRedirectURI(client_id, redirect_uri)))
+            if (!(await this.options.validateRedirectURI(client_id, redirect_uri))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_REDIRECT_URI_INVALID, req);
                 return error(res, {
                     error: 'invalid_request',
                     error_description: 'Redirect URI is not registered',
                     error_uri: this.options.errorUri,
                 });
+            }
 
             // Server is temporary unavailable
             if ((typeof this.options.isTemporaryUnavailable === 'boolean' || typeof this.options.isTemporaryUnavailable === 'undefined'
@@ -159,14 +182,17 @@ export class AuthorizationServer {
                 });
 
             // Reject embedded web views
-            if (this.options.rejectEmbeddedWebViews && isEmbeddedWebView(req))
-                return error(res, {
-                    error: 'invalid_request',
-                    error_description: 'The request was made from an embedded web view, which is not allowed',
-                    error_uri: this.options.errorUri,
-                    redirect_uri,
-                    state
-                });
+            if(isEmbeddedWebView(req)) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_EMBEDDED_WEBVIEW, req);
+                if(this.options.rejectEmbeddedWebViews)
+                    return error(res, {
+                        error: 'invalid_request',
+                        error_description: 'The request was made from an embedded web view, which is not allowed',
+                        error_uri: this.options.errorUri,
+                        redirect_uri,
+                        state
+                    });
+            }
 
             // Get user identification
             let user: any;
@@ -180,7 +206,8 @@ export class AuthorizationServer {
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'authorize' && imp.matchType === response_type);
-            if (!imp)
+            if (!imp) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_UNSUPPORTED, req);
                 return error(res, {
                     error: 'unsupported_response_type',
                     error_description: `Response type ${response_type} is not supported`,
@@ -188,8 +215,10 @@ export class AuthorizationServer {
                     redirect_uri,
                     state
                 });
+            }
 
-            if (!(await this.options.isGrantTypeAllowed!(client_id, imp.matchType)))
+            if (!(await this.options.isGrantTypeAllowed!(client_id, response_type))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
                     error_description: 'This client does not have access to use this authorization flow',
@@ -197,10 +226,12 @@ export class AuthorizationServer {
                     redirect_uri,
                     state
                 });
+            }
 
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.isScopesValid(scopes)))
+            if (!(await this.options.isScopesValid(scopes))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable',
@@ -208,6 +239,7 @@ export class AuthorizationServer {
                     redirect_uri,
                     state
                 });
+            }
 
             // Call implementation function
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
@@ -222,7 +254,7 @@ export class AuthorizationServer {
 
                 const url = buildRedirectURI(redirect_uri, {...response, state});
                 res.header('Cache-Control', 'no-store').redirect(url);
-            }, scopes, user);
+            }, this.eventEmitter, scopes, user);
         };
     }
 
@@ -246,12 +278,14 @@ export class AuthorizationServer {
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
-            if (!imp)
+            if (!imp) {
+                this.eventEmitter.emit(Events.TOKEN_GRANT_TYPE_UNSUPPORTED, req);
                 return error(res, {
                     error: 'unsupported_grant_type',
                     error_description: `Grant type ${grant_type} is not supported`,
                     error_uri: this.options.errorUri
                 });
+            }
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
                 if (err)
@@ -263,7 +297,7 @@ export class AuthorizationServer {
                     });
 
                 res.header('Cache-Control', 'no-store').status(200).json(response);
-            }, undefined, undefined);
+            }, this.eventEmitter, undefined, undefined);
         };
     }
 
@@ -287,12 +321,14 @@ export class AuthorizationServer {
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'device' && imp.matchType === grant_type);
-            if (!imp)
+            if (!imp) {
+                this.eventEmitter.emit(Events.DEVICE_GRANT_TYPE_UNSUPPORTED, req);
                 return error(res, {
                     error: 'unsupported_grant_type',
                     error_description: `Grant type ${grant_type} is not supported`,
                     error_uri: this.options.errorUri
                 });
+            }
 
             imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
                 if (err)
@@ -304,7 +340,7 @@ export class AuthorizationServer {
                     });
 
                 res.header('Cache-Control', 'no-store').status(200).json(response);
-            }, undefined, undefined);
+            }, this.eventEmitter, undefined, undefined);
         };
     }
 
@@ -319,16 +355,19 @@ export class AuthorizationServer {
         let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
         return async (req, res, next) => {
             let token = this.options.getToken(req);
-            if (!token)
+            if (!token) {
+                this.eventEmitter.emit(Events.AUTHENTICATION_TOKEN_MISSING, req);
                 return error(res, {
                     error: 'invalid_request',
                     error_description: 'No access token was provided',
                     error_uri: this.options.errorUri,
                     cache: true
                 });
+            }
 
             let payload: any = verifyToken(token, this.options.secret);
-            if (!payload)
+            if (!payload) {
+                this.eventEmitter.emit(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req);
                 return error(res, {
                     error: 'invalid_token',
                     error_description: 'The access token has expired',
@@ -336,8 +375,10 @@ export class AuthorizationServer {
                     status: 401,
                     cache: true
                 });
+            }
 
-            if(payload.type !== 'access_token')
+            if(payload.type !== 'access_token') {
+                this.eventEmitter.emit(Events.AUTHENTICATION_TOKEN_NOT_ACCESS_TOKEN, req);
                 return error(res, {
                     error: 'invalid_token',
                     error_description: 'The token is not an access token',
@@ -345,8 +386,10 @@ export class AuthorizationServer {
                     status: 401,
                     cache: true
                 });
+            }
 
-            if (scopes && payload.scopes.some((v: string) => !scopes!.includes(v)))
+            if (scopes && payload.scopes.some((v: string) => !scopes!.includes(v))) {
+                this.eventEmitter.emit(Events.AUTHENTICATION_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'insufficient_scope',
                     error_description: 'Client does not have access to this endpoint',
@@ -354,6 +397,7 @@ export class AuthorizationServer {
                     status: 403,
                     cache: true
                 });
+            }
 
             let dbToken = await this.options.getAccessToken({
                 accessToken: token,
@@ -361,7 +405,8 @@ export class AuthorizationServer {
                 user: payload.user
             });
 
-            if (!dbToken || dbToken !== token)
+            if (!dbToken || dbToken !== token) {
+                this.eventEmitter.emit(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req);
                 return error(res, {
                     error: 'invalid_token',
                     error_description: 'The access token has expired',
@@ -369,6 +414,7 @@ export class AuthorizationServer {
                     status: 401,
                     cache: true
                 });
+            }
 
             this.options.setPayloadLocation(req, {
                 clientId: payload.client_id,

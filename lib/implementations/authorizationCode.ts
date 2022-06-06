@@ -2,6 +2,7 @@ import {Implementation} from "../components/implementation";
 import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
 import {codeChallengeHash, defaultCommonOpts} from "../modules/utils";
 import {AuthorizationCodeOptions} from "../components/options/implementations/authorizationCodeOptions";
+import {Events} from "../components/events";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
     let opts = {...options, ...defaultCommonOpts(options)};
@@ -36,26 +37,32 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             name: 'authorization-code',
             endpoint: 'authorize',
             matchType: 'code',
-            function: async (req, serverOpts, issueRefreshToken, callback, scopes, user) => {
+            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter, scopes, user) => {
                 let {client_id, redirect_uri, code_challenge, code_challenge_method} = req.query;
 
                 // Check for PKCE
                 if (opts.usePKCE) {
-                    if (!code_challenge)
+                    if (!code_challenge) {
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Query parameter code_challenge is missing',
                         });
-                    if (!code_challenge_method)
+                    }
+                    if (!code_challenge_method) {
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Query parameter code_challenge_method is missing',
                         });
-                    if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !opts.allowCodeChallengeMethodPlain))
+                    }
+                    if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !opts.allowCodeChallengeMethodPlain)) {
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Code challenge method is not valid',
                         });
+                    }
                 }
 
                 // Generate authorization code
@@ -74,11 +81,13 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     codeChallengeMethod: code_challenge_method
                 });
 
-                if(!dbRes)
+                if(!dbRes) {
+                    eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_SAVE_ERROR, req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error',
                     });
+                }
 
                 // Respond with authorization code
                 callback({code});
@@ -88,7 +97,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             name: 'authorization-code',
             endpoint: 'token',
             matchType: 'authorization_code',
-            function: async (req, serverOpts, issueRefreshToken, callback) => {
+            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
                 let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
                 let {code, redirect_uri, code_verifier} = req.body;
                 if (client_id.length === 0) client_id = req.body.client_id;
@@ -113,25 +122,31 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Token verification
                 let authCodePayload: any = verifyToken(code, serverOpts.secret);
-                if (!authCodePayload)
+                if (!authCodePayload) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_JWT_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'The authorization code has expired'
                     })
+                }
 
                 // Payload verification
-                if (authCodePayload.client_id !== client_id)
+                if (authCodePayload.client_id !== client_id) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_CLIENT_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: `This authorization code does not belong to client ${client_id}`
                     });
+                }
 
                 // Client validation
-                if (!(await opts.validateClient(client_id, client_secret)))
+                if (!(await opts.validateClient(client_id, client_secret))) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID, req);
                     return callback(undefined, {
                         error: 'unauthorized_client',
                         error_description: 'Client authentication failed'
                     });
+                }
 
                 // Database verification
                 let dbCode = await opts.getAuthorizationCode({
@@ -140,26 +155,32 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     user: authCodePayload.user
                 });
 
-                if (!dbCode || dbCode.authorizationCode !== code)
+                if (!dbCode || dbCode.authorizationCode !== code) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'The authorization code has expired'
                     });
+                }
 
                 // Check if redirect uri is the same that was generated on authorization code
-                if (redirect_uri !== dbCode.redirectUri)
+                if (redirect_uri !== dbCode.redirectUri) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_REDIRECT_URI_INVALID, req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'Redirect URI does not match the one that was used during authorization'
                     });
+                }
 
                 // Check PKCE
                 if (opts.usePKCE) {
-                    if (dbCode.codeChallenge !== codeChallengeHash(dbCode.codeChallengeMethod, code_verifier))
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, req);
+                    if (dbCode.codeChallenge !== codeChallengeHash(dbCode.codeChallengeMethod, code_verifier)) {
                         return callback(undefined, {
                             error: 'invalid_grant',
                             error_description: 'Client failed PKCE verification'
                         });
+                    }
                 }
 
                 // Database delete
@@ -185,11 +206,13 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     scopes: dbCode.scopes,
                 });
 
-                if(!dbRes)
+                if(!dbRes) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_SAVE_ERROR, req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error'
                     });
+                }
 
                 // Respond with tokens
                 callback(tokens);
