@@ -26,8 +26,17 @@ export function codeChallengeHash(challenge: 'plain' | 'S256' | undefined, str: 
 }
 
 export function isEmbeddedWebView(req: any): boolean {
-    // TODO - embedded web view
-    //      - https://stackoverflow.com/questions/37591279/detect-if-user-is-using-webview-for-android-ios-or-a-regular-browser
+    const useragent = req.headers['user-agent'];
+
+    // Is IOS
+    if(/iphone|ipod|ipad/.test(useragent)) {
+        // Is not safari
+        if(!(/safari/.test(useragent)))
+            return true;
+    }
+
+    // TODO
+
     return false;
 }
 
