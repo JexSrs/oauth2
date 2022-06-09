@@ -168,7 +168,6 @@ authorizationExpress.get('/protected2', authSrv.authenticate('scope2'), function
     res.status(200).end('protected-content');
 });
 
-
 authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
     console.log('jwt-expired')
 });
@@ -178,9 +177,11 @@ authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
 });
 
 
-
-
-
+/* Client tests at insomnia
+    Request tokens: GET http://localhost:4000/login
+    Client Server - Authenticate: GET http://localhost:4000/secret
+    Authorization Server  - Authenticate: GET http://localhost:5000/protected{'' | '1' | '2'} (Will require bearer token auth)
+*/
 
 // describe('With Encryption', function () {
 //     it('GET (encrypt)', async () => {
@@ -197,4 +198,4 @@ let servers = [
         console.log('Client server listening at', DATA.CLIENT_PORT);
     }),
 ];
-// setTimeout(() => servers.forEach(s => s.close()), 60 * 1000);
+setTimeout(() => servers.forEach(s => s.close()), 60 * 1000);
