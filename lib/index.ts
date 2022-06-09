@@ -1,7 +1,8 @@
-// Options
+// Types
 export {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
 export {ResourceServerOptions} from "./components/options/resourceServerOptions";
 // export {ClientOptions} from "./components/options/clientOptions";
+export {Implementation} from "./components/implementation";
 
 // Classes
 export {AuthorizationServer} from "./authorizationServer";
@@ -12,8 +13,5 @@ export {ResourceServer} from "./resourceServer";
 export {verifyToken, signToken, generateARTokens, getTokenExpiresAt} from "./modules/tokenUtils"
 export * from "./implementations";
 
-// Types
-export {Implementation} from "./components/implementation";
-
-// Events
+// Other
 export {Events} from "./components/events";

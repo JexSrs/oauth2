@@ -1,7 +1,11 @@
+const chai = require('chai');
 const express = require('express');
 const passport = require('passport');
 const OAuth2Strategy = require('passport-oauth2');
-const {AuthorizationServer, authorizationCode, Events} = require('../dist');
+const {AuthorizationServer, authorizationCode, refreshToken, Events} = require('../dist');
+const axios = require("axios");
+const axiosCookieJarSupport = require('axios-cookiejar-support');
+const tough = require('tough-cookie');
 
 const DATA = new (function(){
     this.AUTHORIZATION_PORT = 5000;
@@ -32,16 +36,19 @@ const strategy = new OAuth2Strategy({
     console.log('GOT NEW DATA:', {accessToken, refreshToken, params, profile});
     clientDB = {
         id: 'user-id',
-        profile, params,
+        profile,
         accessToken, refreshToken
     };
     cb(undefined, {
         id: clientDB.id,
-        profile: clientDB.profile
+        profile: clientDB.profile,
+        tokens: {
+            accessToken,
+            refreshToken
+        }
     });
 });
 strategy.userProfile = function (accessToken, done) {
-    console.log('USER_PROFILE:', accessToken);
     // Request user profile here using access token
     done(null, {
         name: 'name',
@@ -68,6 +75,10 @@ clientExpress.use(passport.session());
 
 clientExpress.get('/login', passport.authenticate('oauth2', {scope: ['scope1']})); // Redirect to authorization server login page
 clientExpress.get('/auth/callback',
+    function (req, res, next) {
+        console.log('CALLBACK:', req.query);
+        next();
+    },
     passport.authenticate('oauth2', {failureRedirect: '/failed'}),
     function (req, res) {
         // Successful authentication, redirect home.
@@ -135,6 +146,20 @@ authSrv.use(authorizationCode({
     validateClient: (client_id, client_secret) =>
         client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
 }));
+authSrv.use(refreshToken({
+    validateClient: (client_id, client_secret) =>
+        client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
+    deleteTokens: data => {
+        if(authSrvDB.refreshToken === data.refreshToken)
+            authSrvDB = {};
+        return true;
+    },
+    getRefreshToken: data => {
+        if(authSrvDB.refreshToken === data.refreshToken)
+            return authSrvDB.refreshToken;
+        return null;
+    }
+}));
 
 // Create Authorization (& resource) server
 const authorizationExpress = express();
@@ -177,19 +202,6 @@ authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
 });
 
 
-/* Client tests at insomnia
-    Request tokens: GET http://localhost:4000/login
-    Client Server - Authenticate: GET http://localhost:4000/secret
-    Authorization Server  - Authenticate: GET http://localhost:5000/protected{'' | '1' | '2'} (Will require bearer token auth)
-*/
-
-// describe('With Encryption', function () {
-//     it('GET (encrypt)', async () => {
-//
-//     });
-// });
-
-
 let servers = [
     authorizationExpress.listen(DATA.AUTHORIZATION_PORT, () => {
         console.log('Authorization server listening at', DATA.AUTHORIZATION_PORT);
@@ -199,3 +211,62 @@ let servers = [
     }),
 ];
 setTimeout(() => servers.forEach(s => s.close()), 60 * 1000);
+
+/* Client tests at insomnia
+    Request tokens: GET http://localhost:4000/login
+    Client Server - Authenticate: GET http://localhost:4000/secret
+    Authorization Server  - Authenticate: GET http://localhost:5000/protected{'' | '1' | '2'} (Will require bearer token auth)
+*/
+
+describe("Passport", function () {
+    this.timeout(10 * 1000);
+
+    axiosCookieJarSupport.wrapper(axios);
+    const cookieJar = new tough.CookieJar();
+
+    let tokens;
+    it('Request tokens', () => {
+        return axios.get(DATA.CLIENT_URL + '/login', {
+            jar: cookieJar,
+            withCredentials: true
+        }).then(res => {
+            let data = res.data;
+            chai.expect(data.message).to.equal('success-page');
+            chai.expect(data.user.id).to.equal('user-id');
+            chai.expect(data.user.profile.name).to.equal('name');
+            chai.expect(data.user.profile.email).to.equal('email');
+            tokens = data.user.tokens;
+        });
+    });
+
+    it('Authorization server protected 0', () => {
+        return axios.get(DATA.AUTHORIZATION_URL + '/protected', {
+            headers: {
+                Authorization: `Bearer ${tokens.accessToken}`
+            }
+        }).then(res => {
+            chai.expect(res.data).to.equal('protected-content');
+        });
+    });
+
+    it('Authorization server protected 1', () => {
+        return axios.get(DATA.AUTHORIZATION_URL + '/protected1', {
+            headers: {
+                Authorization: `Bearer ${tokens.accessToken}`
+            }
+        }).then(res => {
+            chai.expect(res.data).to.equal('protected-content');
+        });
+    });
+
+    it('Authorization server protected 2', () => {
+        return axios.get(DATA.AUTHORIZATION_URL + '/protected2', {
+            headers: {
+                Authorization: `Bearer ${tokens.accessToken}`
+            },
+            validateStatus: (status) => true
+        }).then(res => {
+            chai.expect(res.status).to.equal(403);
+        });
+    });
+});
