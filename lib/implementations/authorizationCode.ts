@@ -10,6 +10,12 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
     if(opts.usePKCE === undefined)
         opts.usePKCE = true;
 
+    if(opts.validCodeChallengeMethods === undefined)
+        opts.validCodeChallengeMethods = ['S256', 'plain'];
+
+    if(typeof opts.hashCodeChallenge !== 'function')
+        opts.hashCodeChallenge = (code: string, method: string) => codeChallengeHash(method as any, code);
+
     if(opts.allowCodeChallengeMethodPlain === undefined)
         opts.allowCodeChallengeMethodPlain = false
 
@@ -56,7 +62,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                             error_description: 'Query parameter code_challenge_method is missing',
                         });
                     }
-                    if (!['S256', 'plain'].includes(code_challenge_method) || (code_challenge_method === 'plain' && !opts.allowCodeChallengeMethodPlain)) {
+                    if (!opts.validCodeChallengeMethods.includes(code_challenge_method)) {
                         eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
                         return callback(undefined, {
                             error: 'invalid_request',
@@ -100,24 +106,24 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
                 let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
                 let {code, redirect_uri, code_verifier} = req.body;
-                if (client_id.length === 0) client_id = req.body.client_id;
+                // if (!client_id) client_id = req.body.client_id;
 
                 if (!code)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property code is missing'
+                        error_description: 'Body parameter code is missing'
                     });
 
                 if (!redirect_uri)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property redirect_uri is missing'
+                        error_description: 'Body parameter redirect_uri is missing'
                     });
 
                 if (opts.usePKCE && !code_verifier)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property code_verifier is missing'
+                        error_description: 'Body parameter code_verifier is missing'
                     });
 
                 // Token verification
@@ -174,8 +180,8 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Check PKCE
                 if (opts.usePKCE) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, req);
-                    if (dbCode.codeChallenge !== codeChallengeHash(dbCode.codeChallengeMethod, code_verifier)) {
+                    if((await opts.hashCodeChallenge(code_verifier, dbCode.codeChallengeMethod)) !== dbCode.codeChallenge) {
+                        eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, req);
                         return callback(undefined, {
                             error: 'invalid_grant',
                             error_description: 'Client failed PKCE verification'

@@ -21,13 +21,13 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             if(!username)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Property username is missing'
+                    error_description: 'Body parameter username is missing'
                 });
 
             if(!password)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Property password is missing'
+                    error_description: 'Body parameter password is missing'
                 });
 
             let scopes = scope?.split(serverOpts.scopeDelimiter) || [];

@@ -10,12 +10,17 @@ export type AuthorizationCodeOptions = {
      */
     usePKCE?: boolean;
     /**
-     * Only for enabled PKCE.
-     * If true it will allow code challenge method 'plain' and will not enforce
-     * S256 as mandatory.
-     * Defaults to false.
+     * The valid code challenge methods
+     * Defaults to ['S256', 'plain']
      */
-    allowCodeChallengeMethodPlain?: boolean;
+    validCodeChallengeMethods?: string[];
+    /**
+     * A function that will hash a code with the given method.
+     * Defaults to S256 and plain methods hashing.
+     * @param code
+     * @param method
+     */
+    hashCodeChallenge?: (code: string, method: string) => string | Promise<string>,
     /**
      * The authorization code's lifetime in seconds.
      * Defaults to 60 seconds (1 minute).

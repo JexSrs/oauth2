@@ -48,9 +48,10 @@ export type AuthorizationServerOptions = {
      * For example if the client is confidential you may want to reject implicit grant type.
      * Defaults to true.
      * @param client_id
+     * @param impName The name of the selected implementation
      * @return {boolean} True if it is allowed, false otherwise.
      */
-    isGrantTypeAllowed?: (client_id: string, type: string) => Promise<boolean> | boolean;
+    isGrantTypeAllowed?: (client_id: string, impName: string) => Promise<boolean> | boolean;
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults to ' ' (one space character).
@@ -63,7 +64,7 @@ export type AuthorizationServerOptions = {
      * @param req The request instance.
      * @return {object} The client_id and client_secret.
      */
-    getClientCredentials?: 'header' | 'body' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
+    getClientCredentials?: 'header' | 'body' | 'query' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
     /**
      * Validate that the redirect uri that was passed during authorization is
      * registered matches the client's redirect uris.

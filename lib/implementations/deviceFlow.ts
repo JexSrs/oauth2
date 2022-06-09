@@ -49,7 +49,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 if(!client_id)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property client_id is missing'
+                        error_description: 'Body parameter client_id is missing'
                     });
 
                 let scopes = scope?.split(serverOpts.scopeDelimiter) || [];
@@ -109,13 +109,13 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 if(!client_id)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property client_id is missing'
+                        error_description: 'Body parameter client_id is missing'
                     });
 
                 if(!device_code)
                     return callback(undefined, {
                         error: 'invalid_request',
-                        error_description: 'Property device_code is missing'
+                        error_description: 'Body parameter device_code is missing'
                     });
 
 

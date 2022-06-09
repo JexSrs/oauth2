@@ -19,12 +19,12 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
         function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
             let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
             let {scope, refresh_token} = req.body;
-            if (!client_id) client_id = req.body.client_id;
+            // if (!client_id) client_id = req.body.client_id;
 
             if(!refresh_token)
                 return callback(undefined, {
                     error: 'invalid_request',
-                    error_description: 'Property refresh_token is missing'
+                    error_description: 'Body parameter refresh_token is missing'
                 });
 
             // Verify refresh token

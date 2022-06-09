@@ -60,7 +60,7 @@ export class AuthorizationServer {
         if (typeof opts.scopeDelimiter === 'undefined')
             opts.scopeDelimiter = ' ';
 
-        if(opts.getClientCredentials === 'header')
+        if(opts.getClientCredentials === 'header' || opts.getClientCredentials === undefined)
             opts.getClientCredentials = (req: any) => {
                 let authHeader = req.headers['authorization'];
                 let decoded = authHeader && Buffer.from(authHeader, 'base64').toString() || '';
@@ -73,6 +73,11 @@ export class AuthorizationServer {
                 let {client_id, client_secret} = req.body;
                 return {client_id, client_secret};
             };
+        else if (opts.getClientCredentials === 'query')
+            opts.getClientCredentials = (req: any) => {
+                let {client_id, client_secret} = req.query;
+                return {client_id, client_secret};
+            };
 
         this.options = opts as Required<AuthorizationServerOptions>;
     }
@@ -83,7 +88,6 @@ export class AuthorizationServer {
      */
     public use(implementation: Implementation | Implementation[]): AuthorizationServer {
         let imps = Array.isArray(implementation) ? implementation : [implementation];
-
         imps.forEach(imp => {
             // Name check
             if (!imp.name)
@@ -101,8 +105,8 @@ export class AuthorizationServer {
 
             // Match type duplication check for each endpoint
             let i;
-            if ((i = imps.find(i => i.endpoint === imp.endpoint && i.matchType === imp.matchType)) != null)
-                throw new Error(`Implementation ${imp.name} has the same match type as ${i.matchType}`);
+            if ((i = this.implementations.find(i => i.endpoint === imp.endpoint && i.matchType === imp.matchType)) != null)
+                throw new Error(`Implementation ${imp.name} (${imp.matchType}) has the same match type as ${i.name} (${imp.matchType})`);
 
             if (typeof imp.function !== 'function')
                 throw new Error(`Implementation ${imp.name} has invalid function`);
@@ -216,7 +220,7 @@ export class AuthorizationServer {
                 });
             }
 
-            if (!(await this.options.isGrantTypeAllowed!(client_id, response_type))) {
+            if (!(await this.options.isGrantTypeAllowed!(client_id, imp.name))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
@@ -273,7 +277,7 @@ export class AuthorizationServer {
             if (!grant_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Property grant_type is missing'
+                    error_description: 'Body parameter grant_type is missing'
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'token' && imp.matchType === grant_type);
@@ -316,7 +320,7 @@ export class AuthorizationServer {
             if (!grant_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Property grant_type is missing'
+                    error_description: 'Body parameter grant_type is missing'
                 });
 
             let imp = this.implementations.find(imp => imp.endpoint === 'device' && imp.matchType === grant_type);

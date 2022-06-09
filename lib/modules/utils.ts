@@ -2,18 +2,12 @@ import * as crypto from "crypto";
 import {OAuth2Error} from "../components/types";
 
 export function buildRedirectURI(redirectURI: string, params: { [key: string]: string | undefined }): string {
-    let r = `${redirectURI}?`;
-    for (const key in params) {
-        if(params[key] !== undefined)
-            r += `${key}=${params[key]}&`;
-    }
-
-    return r.substring(0, r.length - 1);
+    return `${redirectURI}?` + Object.keys(params).map(k => `${k}=${params[k]}`).join('&');
 }
 
-export function codeChallengeHash(challenge: 'plain' | 'S256' | undefined, str: string): string {
+export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: string): string {
     let code = str;
-    if (challenge === 'S256') {
+    if (method === 'S256') {
         // Hash
         code = crypto.createHash('sha256').update(code).digest('base64');
 

@@ -9,7 +9,7 @@ export class Client {
 
     public authenticate(): ExpressMiddleware {
         return (req, res, next) => {
-
+            // Check if we have token from another function, if not request and then authenticate.
         };
     }
 }
