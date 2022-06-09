@@ -45,15 +45,19 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 });
             }
 
-            // Check scopes - No need to check with app because the new scopes must
-            // be subset of the refreshTokenPayload.scopes
-            let scopes: string[] = scope.split(serverOpts.scopeDelimiter);
-            if (refreshTokenPayload.scopes.some((v: any) => !scopes.includes(v))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID, req);
-                return callback(undefined, {
-                    error: 'invalid_scope',
-                    error_description: 'One or more scopes are not acceptable'
-                });
+            // Scope is optional
+            let scopes: string[] = refreshTokenPayload.scopes;
+            if(scope) {
+                // Check scopes - No need to check with app because the new scopes must
+                // be subset of the refreshTokenPayload.scopes
+                scopes = scope.split(serverOpts.scopeDelimiter);
+                if (refreshTokenPayload.scopes.some((v: any) => !scopes.includes(v))) {
+                    eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID, req);
+                    return callback(undefined, {
+                        error: 'invalid_scope',
+                        error_description: 'One or more scopes are not acceptable'
+                    });
+                }
             }
 
             // Verify refresh token payload

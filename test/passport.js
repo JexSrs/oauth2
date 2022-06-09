@@ -33,7 +33,7 @@ const strategy = new OAuth2Strategy({
     pkce: true,
     state: true,
 }, function(req, accessToken, refreshToken, params, profile, cb) {
-    console.log('GOT NEW DATA:', {accessToken, refreshToken, params, profile});
+    //console.log('GOT NEW DATA:', {accessToken, refreshToken, params, profile});
     clientDB = {
         id: 'user-id',
         profile,
@@ -76,7 +76,7 @@ clientExpress.use(passport.session());
 clientExpress.get('/login', passport.authenticate('oauth2', {scope: ['scope1']})); // Redirect to authorization server login page
 clientExpress.get('/auth/callback',
     function (req, res, next) {
-        console.log('CALLBACK:', req.query);
+        //console.log('CALLBACK:', req.query);
         next();
     },
     passport.authenticate('oauth2', {failureRedirect: '/failed'}),
@@ -109,11 +109,13 @@ let authSrv = new AuthorizationServer({
     isScopesValid: (scopes) => scopes.some(s => ['scope1', 'scope2'].includes(s)),
     getUser: req => req.loggedInUser,
     getAccessToken: data => {
+        console.log('GET ACCESS', authSrvDB.accessToken === data.accessToken)
         if(authSrvDB.accessToken === data.accessToken)
             return authSrvDB.accessToken;
         return null;
     },
     saveTokens: data => {
+        console.log('Saving tokens', data)
         authSrvDB = data;
         return true;
     },
@@ -150,6 +152,7 @@ authSrv.use(refreshToken({
     validateClient: (client_id, client_secret) =>
         client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
     deleteTokens: data => {
+        console.log('DELETING', authSrvDB.refreshToken === data.refreshToken)
         if(authSrvDB.refreshToken === data.refreshToken)
             authSrvDB = {};
         return true;
@@ -167,7 +170,7 @@ authorizationExpress.use(express.urlencoded({type: "application/x-www-form-urlen
 // authorizationExpress.use(express.json({type: "**/**"}));
 
 authorizationExpress.get('/oauth/v2/authorize', function (req, res, next) {
-    console.log('AUTHORIZE:', req.query);
+    //console.log('AUTHORIZE:', req.query);
     // Verify user ...
     req.loggedInUser = `username`
 
@@ -175,7 +178,7 @@ authorizationExpress.get('/oauth/v2/authorize', function (req, res, next) {
 }, authSrv.authorize());
 
 authorizationExpress.post('/oauth/v2/token', function (req, res, next) {
-    console.log('TOKEN:', req.body, req.query);
+    //console.log('TOKEN:', req.body, req.query);
     // console.log(req)
     next();
 }, authSrv.token());
@@ -193,13 +196,8 @@ authorizationExpress.get('/protected2', authSrv.authenticate('scope2'), function
     res.status(200).end('protected-content');
 });
 
-authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
-    console.log('jwt-expired')
-});
-
-authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
-    console.log('db-expired')
-});
+authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => console.log('jwt-expired'));
+authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => console.log('db-expired'));
 
 
 let servers = [
@@ -236,6 +234,7 @@ describe("Passport", function () {
             chai.expect(data.user.profile.name).to.equal('name');
             chai.expect(data.user.profile.email).to.equal('email');
             tokens = data.user.tokens;
+            console.log({tokens})
         });
     });
 
@@ -267,6 +266,33 @@ describe("Passport", function () {
             validateStatus: (status) => true
         }).then(res => {
             chai.expect(res.status).to.equal(403);
+        });
+    });
+
+    it('Refresh token', () => {
+        return axios.post(DATA.AUTHORIZATION_URL + '/oauth/v2/token',
+            'grant_type=refresh_token'
+            + `&client_id=${DATA.CLIENT_ID}`
+            + `&client_secret=${DATA.CLIENT_SECRET}`
+            + `&refresh_token=${tokens.refreshToken}`, {
+        }).then(res => {
+            chai.expect(res.status).to.equal(200);
+            chai.expect(res.data.token_type).to.equal('Bearer');
+            chai.expect(res.data.scope).to.equal('scope1');
+            chai.expect(res.data.access_token).to.be.a('string');
+            chai.expect(res.data.refresh_token).to.be.a('string');
+        });
+    });
+
+    it('Authorization server protected 0 (with old tokens)', () => {
+        return axios.get(DATA.AUTHORIZATION_URL + '/protected', {
+            headers: {
+                Authorization: `Bearer ${tokens.accessToken}`
+            },
+            validateStatus: (status) => true
+        }).then(res => {
+            chai.expect(res.status).to.equal(401);
+            chai.expect(res.data.error).to.equal('invalid_token');
         });
     });
 });

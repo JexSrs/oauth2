@@ -1,17 +1,24 @@
 import * as jwt from "jsonwebtoken";
 import {ARTokens} from "../components/types";
 import {AuthorizationServerOptions} from "../components/options/authorizationServerOptions";
+import {randStr} from "./utils";
 
 export function signToken(payload: object, secret: string, expiresIn?: number): string {
-    return jwt.sign(payload, secret, {
-        algorithm: 'HS512',
+    return jwt.sign({
+        random: randStr(64),
+        payload
+    }, secret, {
         expiresIn,
     });
 }
 
 export function verifyToken(token: string, secret: string): object | null {
     try {
-        return jwt.verify(token, secret) as any;
+        let payload = jwt.verify(token, secret) as any;
+        let contents = payload.payload;
+        delete payload.payload
+        delete payload.random;
+        return {...contents, ...payload};
     } catch (e) {
         return null;
     }
@@ -52,6 +59,6 @@ export async function generateARTokens(payload: object, client_id: string, scope
 }
 
 export function getTokenExpiresAt(tokens: ARTokens, lifetime: number, type: 'access' | 'refresh'): number | undefined {
-    if((type == 'access' && tokens.expires_in) || (type === 'access' && tokens.refresh_token))
-        return Math.trunc((Date.now() + lifetime * 1000) / 1000);
+    if((type == 'access' && tokens.expires_in) || (type === 'refresh' && tokens.refresh_token))
+        return Math.floor((Date.now() + lifetime * 1000) / 1000);
 }
