@@ -9,7 +9,7 @@
     },
     "scripts": {
         "build": "rm -rf dist && tsc -d",
-        "test": "tsc && mocha --exit --bail"
+        "test": "npm run build && mocha --exit --bail"
     },
     "license": "Apache-2.0",
     "repository": {

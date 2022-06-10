@@ -1,5 +1,5 @@
 import {ExpressMiddleware} from "./components/types";
-import {buildRedirectURI, error, validateUserAgent} from "./modules/utils";
+import {buildQuery, error, validateUserAgent} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
@@ -254,7 +254,7 @@ export class AuthorizationServer {
                         state
                     });
 
-                const url = buildRedirectURI(redirect_uri, {...response, state});
+                const url = `${redirect_uri}?${buildQuery({...response, state})}`;
                 res.header('Cache-Control', 'no-store').redirect(url);
             }, this.eventEmitter, scopes, user);
         };

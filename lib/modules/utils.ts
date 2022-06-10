@@ -1,8 +1,8 @@
 import * as crypto from "crypto";
 import {OAuth2Error} from "../components/types";
 
-export function buildRedirectURI(redirectURI: string, params: { [key: string]: string | undefined }): string {
-    return `${redirectURI}?` + Object.keys(params).map(k => `${k}=${params[k]}`).join('&');
+export function buildQuery(params: { [key: string]: string | undefined }): string {
+    return Object.keys(params).map(k => params[k] ? `${k}=${params[k]}` : undefined).filter(s => s != undefined).join('&');
 }
 
 export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: string): string {
@@ -70,7 +70,7 @@ export function error(res: any, data: OAuth2Error & { redirect_uri?: string; sta
     res.header('WWW-Authenticate', wwwAuthHeader)
 
     if (data.redirect_uri)
-        res.redirect(buildRedirectURI(data.redirect_uri, resp));
+        res.redirect(`${data.redirect_uri}?${buildQuery(resp)}`);
     else
         res.status(data.status || 400).json(resp)
 }
