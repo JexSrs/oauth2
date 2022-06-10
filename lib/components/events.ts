@@ -2,7 +2,7 @@ export enum Events {
     // Authorization
     AUTHORIZATION_REDIRECT_URI_INVALID = 'authorization.redirect-uri.invalid',
     AUTHORIZATION_SCOPES_INVALID = 'authorization.scopes.invalid',
-    AUTHORIZATION_EMBEDDED_WEBVIEW = 'authorization.embedded-web-view',
+    AUTHORIZATION_USERGAENT_INVALID = 'authorization.user-agent.invalid',
     AUTHORIZATION_RESPONSE_TYPE_UNSUPPORTED = 'authorization.response-type.unsupported',
     AUTHORIZATION_RESPONSE_TYPE_REJECT = 'authorization.response-type.reject',
     // Authorization flow "code"

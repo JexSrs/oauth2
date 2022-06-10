@@ -1,5 +1,5 @@
 import {ExpressMiddleware} from "./components/types";
-import {buildRedirectURI, error, isEmbeddedWebView} from "./modules/utils";
+import {buildRedirectURI, error, validateUserAgent} from "./modules/utils";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
@@ -51,8 +51,8 @@ export class AuthorizationServer {
         if (typeof opts.isTemporaryUnavailable === 'undefined')
             opts.isTemporaryUnavailable = false;
 
-        if (typeof opts.rejectEmbeddedWebViews === 'undefined')
-            opts.rejectEmbeddedWebViews = true;
+        if (typeof opts.validateUserAgent === 'undefined')
+            opts.validateUserAgent = validateUserAgent;
 
         if (typeof opts.isGrantTypeAllowed === 'undefined')
             opts.isGrantTypeAllowed = (client_id) => true;
@@ -185,16 +185,15 @@ export class AuthorizationServer {
                 });
 
             // Reject embedded web views
-            if(isEmbeddedWebView(req)) {
-                this.eventEmitter.emit(Events.AUTHORIZATION_EMBEDDED_WEBVIEW, req);
-                if(this.options.rejectEmbeddedWebViews)
-                    return error(res, {
-                        error: 'invalid_request',
-                        error_description: 'The request was made from an embedded web view, which is not allowed',
-                        error_uri: this.options.errorUri,
-                        redirect_uri,
-                        state
-                    });
+            if(!(await this.options.validateUserAgent(req.headers['user-agent']))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_USERGAENT_INVALID, req);
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'The request was made from a not acceptable source',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
             }
 
             // Get user identification

@@ -38,11 +38,11 @@ export type AuthorizationServerOptions = {
      */
     isTemporaryUnavailable?: boolean | ((req: any) => Promise<boolean>);
     /**
-     * If the request was made using an embedded web view the request will be rejected.
-     * The agent header will be used to verify the browser that makes the request.
-     * Defaults to true.
+     * It will parse and check the user for embedded web views, bots and other.
+     * Defaults to embedded web view and bots checks.
+     * @returns {boolean} True if validation succeeded, false otherwise.
      */
-    rejectEmbeddedWebViews?: boolean;
+    validateUserAgent?: (useragent: string) => boolean | Promise<boolean>;
     /**
      * Checks if grant type is allowed for a specific client during authorization.
      * For example if the client is confidential you may want to reject implicit grant type.

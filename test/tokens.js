@@ -7,7 +7,7 @@ const EXPIRES_IN = 5;
 
 describe("Tokens", function () {
     it('JWT / payload verification', () => {
-        let tokens = Array.from({length: 20}, (e, k) => signToken(PAYLOAD, SECRET, EXPIRES_IN));
+        let tokens = Array.from({length: 50}, (e, k) => signToken(PAYLOAD, SECRET, EXPIRES_IN));
         let validated = tokens.map(token => verifyToken(token, SECRET));
         validated.forEach(payload => {
             chai.expect(payload).to.be.an('object')
@@ -16,8 +16,7 @@ describe("Tokens", function () {
     });
 
     it('JWT duplicity', () => {
-        let tokens = Array.from({length: 20}, (e, k) => signToken(PAYLOAD, SECRET, EXPIRES_IN));
-        for (let i = 1; i < tokens.length; i++)
-            chai.expect(tokens[i - 1] === tokens[i]).to.equal(false);
+        let tokens = Array.from({length: 400}, (e, k) => signToken(PAYLOAD, SECRET, EXPIRES_IN));
+        tokens.forEach(token => chai.expect(tokens.filter(t => t === token).length).to.equal(1));
     });
 });

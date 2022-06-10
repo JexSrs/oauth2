@@ -8,10 +8,10 @@ const axiosCookieJarSupport = require('axios-cookiejar-support');
 const tough = require('tough-cookie');
 
 const DATA = new (function(){
-    this.AUTHORIZATION_PORT = 5000;
+    this.AUTHORIZATION_PORT = 3000;
     this.AUTHORIZATION_URL = `http://localhost:${this.AUTHORIZATION_PORT}`;
     this.AUTHORIZATION_ERROR_URI = `${this.AUTHORIZATION_URL}/docs/error_uri`;
-    this.CLIENT_PORT = 4000;
+    this.CLIENT_PORT = 3001;
     this.CLIENT_URL = `http://localhost:${this.CLIENT_PORT}`;
     this.CLIENT_CALLBACK_URL = `${this.CLIENT_URL}/auth/callback`;
     this.CLIENT_ID = 'my-client-id';
@@ -94,7 +94,7 @@ clientExpress.get('/success', (req, res) => res.status(200).json({
 }));
 
 clientExpress.get('/secret', isLoggedIn, (req, res) =>{
-    console.log(req.user);
+    // console.log(req.user);
     res.send('secret-page');
 });
 
@@ -109,13 +109,13 @@ let authSrv = new AuthorizationServer({
     isScopesValid: (scopes) => scopes.some(s => ['scope1', 'scope2'].includes(s)),
     getUser: req => req.loggedInUser,
     getAccessToken: data => {
-        console.log('GET ACCESS', authSrvDB.accessToken === data.accessToken)
+        // console.log('GET ACCESS', authSrvDB.accessToken === data.accessToken)
         if(authSrvDB.accessToken === data.accessToken)
             return authSrvDB.accessToken;
         return null;
     },
     saveTokens: data => {
-        console.log('Saving tokens', data)
+        // console.log('Saving tokens', data)
         authSrvDB = data;
         return true;
     },
@@ -123,7 +123,7 @@ let authSrv = new AuthorizationServer({
         client_id === DATA.CLIENT_ID && redirect_uri === DATA.CLIENT_CALLBACK_URL,
     isGrantTypeAllowed: (client_id, type) => true,
     isTemporaryUnavailable: req => false,
-    rejectEmbeddedWebViews: false,
+    validateUserAgent: (ua) => true,
     setPayloadLocation: (req, payload) => req.payload = payload,
     getClientCredentials: 'body'
 });
@@ -152,7 +152,7 @@ authSrv.use(refreshToken({
     validateClient: (client_id, client_secret) =>
         client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
     deleteTokens: data => {
-        console.log('DELETING', authSrvDB.refreshToken === data.refreshToken)
+        // console.log('DELETING', authSrvDB.refreshToken === data.refreshToken)
         if(authSrvDB.refreshToken === data.refreshToken)
             authSrvDB = {};
         return true;
@@ -196,8 +196,12 @@ authorizationExpress.get('/protected2', authSrv.authenticate('scope2'), function
     res.status(200).end('protected-content');
 });
 
-authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => console.log('jwt-expired'));
-authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => console.log('db-expired'));
+authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
+    // console.log('jwt-expired');
+});
+authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
+    // console.log('db-expired');
+});
 
 
 let servers = [
@@ -234,11 +238,10 @@ describe("Passport", function () {
             chai.expect(data.user.profile.name).to.equal('name');
             chai.expect(data.user.profile.email).to.equal('email');
             tokens = data.user.tokens;
-            console.log({tokens})
         });
     });
 
-    it('Authorization server protected 0', () => {
+    it('Authorization server (no scope)', () => {
         return axios.get(DATA.AUTHORIZATION_URL + '/protected', {
             headers: {
                 Authorization: `Bearer ${tokens.accessToken}`
@@ -248,7 +251,7 @@ describe("Passport", function () {
         });
     });
 
-    it('Authorization server protected 1', () => {
+    it('Authorization server (scope1)', () => {
         return axios.get(DATA.AUTHORIZATION_URL + '/protected1', {
             headers: {
                 Authorization: `Bearer ${tokens.accessToken}`
@@ -258,7 +261,7 @@ describe("Passport", function () {
         });
     });
 
-    it('Authorization server protected 2', () => {
+    it('Authorization server (scope2)', () => {
         return axios.get(DATA.AUTHORIZATION_URL + '/protected2', {
             headers: {
                 Authorization: `Bearer ${tokens.accessToken}`
@@ -284,7 +287,7 @@ describe("Passport", function () {
         });
     });
 
-    it('Authorization server protected 0 (with old tokens)', () => {
+    it('Authorization server (no scope) old tokens', () => {
         return axios.get(DATA.AUTHORIZATION_URL + '/protected', {
             headers: {
                 Authorization: `Bearer ${tokens.accessToken}`

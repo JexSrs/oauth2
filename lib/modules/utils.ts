@@ -19,9 +19,7 @@ export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: str
     return code;
 }
 
-export function isEmbeddedWebView(req: any): boolean {
-    const useragent = req.headers['user-agent'];
-
+export function validateUserAgent(useragent: string): boolean {
     // Is IOS
     if(/iphone|ipod|ipad/.test(useragent)) {
         // Is not safari
@@ -29,6 +27,7 @@ export function isEmbeddedWebView(req: any): boolean {
             return true;
     }
 
+    // Is Android
     // TODO
 
     return false;
