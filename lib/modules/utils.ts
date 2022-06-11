@@ -24,13 +24,13 @@ export function validateUserAgent(useragent: string): boolean {
     if(/iphone|ipod|ipad/.test(useragent)) {
         // Is not safari
         if(!(/safari/.test(useragent)))
-            return true;
+            return false;
     }
 
     // Is Android
     // TODO
 
-    return false;
+    return true;
 }
 
 export function defaultCommonOpts(options: any) {

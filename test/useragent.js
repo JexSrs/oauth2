@@ -206,54 +206,54 @@ const bots = [
 
 describe("User Agent", function () {
     it('IOS (Valid)', () => {
-        iosValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        iosValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('IOS (Invalid)', () => {
-        iosInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        iosInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Android (Valid)', () => {
-        androidValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        androidValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('Android (Invalid)', () => {
-        androidInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        androidInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Windows Phone (Valid)', () => {
-        windowPhoneValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        windowPhoneValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('Windows Phone (Invalid)', () => {
-        windowPhoneInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        windowPhoneInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Desktops (Valid)', () => {
-        desktopsValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        desktopsValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('Desktops (Invalid)', () => {
-        desktopsInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        desktopsInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Game consoles (Valid)', () => {
-        gameConsolesValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        gameConsolesValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('Game consoles (Invalid)', () => {
-        gameConsolesInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        gameConsolesInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Other (Valid)', () => {
-        otherValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
+        otherValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
     it('Other (Invalid)', () => {
-        otherInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+        otherInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     // it('Bots & Crawlers', () => {
-    //     bots.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
+    //     bots.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     // });
 });
