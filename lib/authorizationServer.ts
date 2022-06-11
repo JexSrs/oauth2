@@ -6,6 +6,8 @@ import {AuthorizationServerOptions} from "./components/options/authorizationServ
 import EventEmitter from "events";
 import {Events} from "./components/events";
 
+// TODO - Implement other specs https://www.oauth.com/oauth2-servers/map-oauth-2-0-specs/
+
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 // TODO - Support to do all checks async using Promise.all([p1, p2, p3]).spread(function (r1, r2, r3) {})
 // TODO - Support openid https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
