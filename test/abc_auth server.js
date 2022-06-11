@@ -123,7 +123,7 @@ authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
 authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
     // console.log('db-expired');
 });
-authSrv.on(Events.DEVICE_FLOWS_TOKEN_PENDING, req => {
+authSrv.on(Events.TOKEN_FLOWS_DEVICE_CODE_PENDING, req => {
     devicePendingRequestCounter++;
     if(devicePendingRequestCounter === 2)
         deviceDB.status = 'completed';
