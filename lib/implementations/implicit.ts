@@ -7,23 +7,23 @@ export function implicit(): Implementation {
         name: 'authorization-code',
         endpoint: 'authorize',
         matchType: 'token',
-        function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter, scopes, user) => {
-            let {client_id} = req.query;
+        function: async (data, callback, eventEmitter) => {
+            let {client_id} = data.req.query;
 
             // Generate access token
-            let tokens = await generateARTokens({user}, client_id, scopes!, serverOpts, false);
+            let tokens = generateARTokens({user: data.user}, client_id, data.scopes!, data.serverOpts, false);
 
             // Database save
-            let dbRes = await serverOpts.saveTokens({
+            let dbRes = await data.serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
+                accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                 clientId: client_id,
-                user,
-                scopes: scopes!,
+                user: data.user!,
+                scopes: data.scopes!,
             });
 
             if(!dbRes) {
-                eventEmitter.emit(Events.AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR, req);
+                eventEmitter.emit(Events.AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error'

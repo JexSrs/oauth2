@@ -43,27 +43,27 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             name: 'authorization-code',
             endpoint: 'authorize',
             matchType: 'code',
-            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter, scopes, user) => {
-                let {client_id, redirect_uri, code_challenge, code_challenge_method} = req.query;
+            function: async (data, callback, eventEmitter) => {
+                let {client_id, redirect_uri, code_challenge, code_challenge_method} = data.req.query;
 
                 // Check for PKCE
                 if (opts.usePKCE) {
                     if (!code_challenge) {
-                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Query parameter code_challenge is missing',
                         });
                     }
                     if (!code_challenge_method) {
-                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Query parameter code_challenge_method is missing',
                         });
                     }
                     if (!opts.validCodeChallengeMethods.includes(code_challenge_method)) {
-                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, req);
+                        eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_request',
                             error_description: 'Code challenge method is not valid',
@@ -72,23 +72,23 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 }
 
                 // Generate authorization code
-                let payload = {client_id, user};
-                let code = signToken(payload, serverOpts.secret, opts.authorizationCodeLifetime);
+                let payload = {client_id, user: data.user};
+                let code = signToken(payload, data.serverOpts.secret, opts.authorizationCodeLifetime);
 
                 // Save authorization code to database
                 let dbRes = await opts.saveAuthorizationCode({
                     authorizationCode: code,
                     expiresAt: Math.trunc((Date.now() + opts.authorizationCodeLifetime * 1000) / 1000),
                     clientId: client_id,
-                    scopes: scopes!,
-                    user,
+                    scopes: data.scopes!,
+                    user: data.user!,
                     redirectUri: redirect_uri,
                     codeChallenge: code_challenge,
                     codeChallengeMethod: code_challenge_method
                 });
 
                 if(!dbRes) {
-                    eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_SAVE_ERROR, req);
+                    eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_SAVE_ERROR, data.req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error',
@@ -103,9 +103,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
             name: 'authorization-code',
             endpoint: 'token',
             matchType: 'authorization_code',
-            function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
-                let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
-                let {code, redirect_uri, code_verifier} = req.body;
+            function: async (data, callback, eventEmitter) => {
+                let {client_id, client_secret} = (data.serverOpts.getClientCredentials as any)(data.req);
+                let {code, redirect_uri, code_verifier} = data.req.body;
                 // if (!client_id) client_id = req.body.client_id;
 
                 if (!code)
@@ -127,9 +127,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     });
 
                 // Token verification
-                let authCodePayload: any = verifyToken(code, serverOpts.secret);
+                let authCodePayload: any = verifyToken(code, data.serverOpts.secret);
                 if (!authCodePayload) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_JWT_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_JWT_INVALID, data.req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'The authorization code has expired'
@@ -138,7 +138,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Payload verification
                 if (authCodePayload.client_id !== client_id) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_CLIENT_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_CLIENT_INVALID, data.req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: `This authorization code does not belong to client ${client_id}`
@@ -147,7 +147,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Client validation
                 if (!(await opts.validateClient(client_id, client_secret))) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID, data.req);
                     return callback(undefined, {
                         error: 'unauthorized_client',
                         error_description: 'Client authentication failed'
@@ -162,7 +162,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 });
 
                 if (!dbCode || dbCode.authorizationCode !== code) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID, data.req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'The authorization code has expired'
@@ -171,7 +171,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Check if redirect uri is the same that was generated on authorization code
                 if (redirect_uri !== dbCode.redirectUri) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_REDIRECT_URI_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_REDIRECT_URI_INVALID, data.req);
                     return callback(undefined, {
                         error: 'invalid_grant',
                         error_description: 'Redirect URI does not match the one that was used during authorization'
@@ -181,7 +181,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 // Check PKCE
                 if (opts.usePKCE) {
                     if((await opts.hashCodeChallenge(code_verifier, dbCode.codeChallengeMethod)) !== dbCode.codeChallenge) {
-                        eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, req);
+                        eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_grant',
                             error_description: 'Client failed PKCE verification'
@@ -197,23 +197,23 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 });
 
                 // Generate access & refresh tokens
-                let tokens = await generateARTokens({
+                let tokens = generateARTokens({
                     user: dbCode.user
-                }, client_id, dbCode.scopes, serverOpts, issueRefreshToken);
+                }, client_id, dbCode.scopes, data.serverOpts, data.issueRefreshToken);
 
                 // Database save
-                let dbRes = await serverOpts.saveTokens({
+                let dbRes = await data.serverOpts.saveTokens({
                     accessToken: tokens.access_token,
-                    accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
+                    accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                     refreshToken: tokens.refresh_token,
-                    refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
+                    refreshTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.refreshTokenLifetime!, 'refresh'),
                     clientId: client_id,
                     user: dbCode.user,
                     scopes: dbCode.scopes,
                 });
 
                 if(!dbRes) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_SAVE_ERROR, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_SAVE_ERROR, data.req);
                     return callback(undefined, {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error'

@@ -10,14 +10,14 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
         name: 'client-credentials',
         endpoint: 'token',
         matchType: 'client_credentials',
-        function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
-            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
-            const {scope} = req.body;
+        function: async (data, callback, eventEmitter) => {
+            let {client_id, client_secret} = (data.serverOpts.getClientCredentials as any)(data.req);
+            const {scope} = data.req.body;
 
             // Validate scopes
             let scopes = scope?.split(' ') || [];
-            if (!(await serverOpts.isScopesValid(scopes))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID, req);
+            if (!(await data.serverOpts.isScopesValid(scopes))) {
+                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable'
@@ -26,7 +26,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
 
             // Validate client
             if (!(await opts.validateClient(client_id, client_secret))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',
                     error_description: 'Client authentication failed'
@@ -34,18 +34,18 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
             }
 
             // Generate access token
-            let tokens = await generateARTokens({}, client_id, scopes, serverOpts, false);
+            let tokens = generateARTokens({}, client_id, scopes, data.serverOpts, false);
 
             // Save to database
-            let dbRes = await serverOpts.saveTokens({
+            let dbRes = await data.serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
+                accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                 clientId: client_id,
                 scopes,
             });
 
             if(!dbRes) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error'

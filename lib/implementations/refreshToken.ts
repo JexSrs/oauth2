@@ -16,9 +16,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
         name: 'refresh-token',
         endpoint: 'token',
         matchType: 'refresh_token',
-        function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
-            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
-            let {scope, refresh_token} = req.body;
+        function: async (data, callback, eventEmitter) => {
+            let {client_id, client_secret} = (data.serverOpts.getClientCredentials as any)(data.req);
+            let {scope, refresh_token} = data.req.body;
             // if (!client_id) client_id = req.body.client_id;
 
             if(!refresh_token)
@@ -28,9 +28,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 });
 
             // Verify refresh token
-            let refreshTokenPayload: any = verifyToken(refresh_token, serverOpts.secret);
+            let refreshTokenPayload: any = verifyToken(refresh_token, data.serverOpts.secret);
             if (!refreshTokenPayload) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
                     error_description: 'The refresh token has expired'
@@ -38,7 +38,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             }
 
             if(refreshTokenPayload.type !== 'refresh_token') {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
                     error_description: 'Provided token is not a refresh token'
@@ -50,9 +50,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             if(scope) {
                 // Check scopes - No need to check with app because the new scopes must
                 // be subset of the refreshTokenPayload.scopes
-                scopes = scope.split(serverOpts.scopeDelimiter);
+                scopes = scope.split(data.serverOpts.scopeDelimiter);
                 if (refreshTokenPayload.scopes.some((v: any) => !scopes.includes(v))) {
-                    eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID, req);
+                    eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID, data.req);
                     return callback(undefined, {
                         error: 'invalid_scope',
                         error_description: 'One or more scopes are not acceptable'
@@ -62,7 +62,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
 
             // Verify refresh token payload
             if (refreshTokenPayload.client_id !== client_id) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
                     error_description: `This refresh token does not belong to client ${client_id}`
@@ -71,7 +71,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
 
             // Validate client
             if (!(await opts.validateClient(client_id, client_secret))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',
                     error_description: 'Client authentication failed'
@@ -86,7 +86,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             });
 
             if (!dbToken || dbToken !== refresh_token) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
                     error_description: 'The refresh token has expired'
@@ -101,23 +101,23 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             });
 
             // Generate new tokens
-            let tokens = await generateARTokens({
+            let tokens = generateARTokens({
                 user: refreshTokenPayload.user
-            }, client_id, scopes, serverOpts, true);
+            }, client_id, scopes, data.serverOpts, true);
 
             // Database save
-            let dbRes = await serverOpts.saveTokens({
+            let dbRes = await data.serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
+                accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                 refreshToken: tokens.refresh_token,
-                refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
+                refreshTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.refreshTokenLifetime!, 'refresh'),
                 clientId: client_id,
                 user: refreshTokenPayload.user,
                 scopes,
             });
 
             if(!dbRes) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error',

@@ -24,7 +24,7 @@ export function verifyToken(token: string, secret: string): object | null {
     }
 }
 
-export async function generateARTokens(payload: object, client_id: string, scopes: string[], opts: AuthorizationServerOptions, issueRefreshToken: boolean): Promise<ARTokens> {
+export function generateARTokens(payload: object, client_id: string, scopes: string[], opts: AuthorizationServerOptions, issueRefreshToken: boolean): ARTokens {
     let accessTokenPayload = {
         ...payload,
         type: 'access_token',

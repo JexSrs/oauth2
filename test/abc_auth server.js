@@ -1,9 +1,12 @@
 const express = require('express');
 const DATA = require("./data");
-const {AuthorizationServer, implicit, clientCredentials, resourceOwnerCredentials, refreshToken, authorizationCode, Events} = require("../dist");
+const {AuthorizationServer, implicit, clientCredentials, resourceOwnerCredentials, refreshToken, authorizationCode, deviceFlow, Events} = require("../dist");
 
 let authSrvDB = {};
 let authCodeDB = {};
+let bucketDB = {};
+let deviceDB = {};
+let devicePendingRequestCounter = 0;
 
 let authSrv = new AuthorizationServer({
     errorUri: DATA.AUTHORIZATION_ERROR_URI,
@@ -80,12 +83,50 @@ authSrv.use(refreshToken({
         return null;
     }
 }));
+authSrv.use(deviceFlow({
+    expiresIn: 60,
+    interval: 3,
+    verificationURI: 'https://example.com/device',
+    validateClient: client_id => client_id === DATA.CLIENT_ID,
+    getUser: (deviceCode, userCode) => {
+        return {id: 'user-id'};
+    },
+    saveBucket: (deviceCode, bucket, expiresIn) => {
+        bucketDB = {deviceCode, bucket, expiresIn};
+        return true;
+    },
+    getBucket: deviceCode => {
+        if(deviceCode === bucketDB.deviceCode)
+            return bucketDB.bucket;
+        return null;
+    },
+    saveDevice: data => {
+        deviceDB = data;
+        return true;
+    },
+    getDevice: data => {
+        if(data.deviceCode === deviceDB.deviceCode)
+            return deviceDB;
+        return null;
+    },
+    removeDevice: data => {
+        if(data.deviceCode === deviceDB.deviceCode)
+            deviceDB = {};
+        return true;
+    }
+}));
+
 
 authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
     // console.log('jwt-expired');
 });
 authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
     // console.log('db-expired');
+});
+authSrv.on(Events.DEVICE_FLOWS_TOKEN_PENDING, req => {
+    devicePendingRequestCounter++;
+    if(devicePendingRequestCounter === 2)
+        deviceDB.status = 'completed';
 });
 
 // EXPRESS
@@ -101,10 +142,16 @@ authorizationExpress.get('/oauth/v2/authorize', function (req, res, next) {
 }, authSrv.authorize());
 
 authorizationExpress.post('/oauth/v2/token', function (req, res, next) {
-    //console.log('TOKEN:', req.body, req.query);
+    // console.log('TOKEN:', req.body, req.query);
     // console.log(req)
     next();
 }, authSrv.token());
+
+authorizationExpress.post('/oauth/v2/device', function (req, res, next) {
+    //console.log('TOKEN:', req.body, req.query);
+    // console.log(req)
+    next();
+}, authSrv.device());
 
 // No scope validation
 authorizationExpress.get('/protected', authSrv.authenticate(), function (req, res) {

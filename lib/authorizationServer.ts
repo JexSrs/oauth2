@@ -94,7 +94,7 @@ export class AuthorizationServer {
                 throw new Error('Implementation name is missing');
 
             // Endpoint check
-            if (imp.endpoint !== 'token' && imp.endpoint !== 'authorize')
+            if (!['authorize', 'token', 'device'].includes(imp.endpoint))
                 throw new Error(`Implementation ${imp.name} has invalid endpoint`);
 
             // Response or grant type check
@@ -244,19 +244,25 @@ export class AuthorizationServer {
             }
 
             // Call implementation function
-            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+            imp.function({
+                req,
+                serverOpts: this.options,
+                scopes,
+                user,
+                issueRefreshToken: this.issueRefreshToken
+            }, (response, err) => {
                 if (err)
                     return error(res, {
                         error: err.error,
                         error_description: err.error_description,
-                        error_uri: err.error_uri || this.options.errorUri,
+                        error_uri: err.hasOwnProperty('error_uri') ? err.error_uri : this.options.errorUri,
                         redirect_uri,
                         state
                     });
 
                 const url = `${redirect_uri}?${buildQuery({...response, state})}`;
                 res.header('Cache-Control', 'no-store').redirect(url);
-            }, this.eventEmitter, scopes, user);
+            }, this.eventEmitter);
         };
     }
 
@@ -289,17 +295,21 @@ export class AuthorizationServer {
                 });
             }
 
-            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+            imp.function({
+                req,
+                serverOpts: this.options,
+                issueRefreshToken: this.issueRefreshToken
+            }, (response, err) => {
                 if (err)
                     return error(res, {
                         error: err.error,
                         error_description: err.error_description,
-                        error_uri: err.error_uri ? err.error_uri : this.options.errorUri,
+                        error_uri: err.hasOwnProperty('error_uri') ? err.error_uri : this.options.errorUri,
                         status: err.status
                     });
 
                 res.header('Cache-Control', 'no-store').status(200).json(response);
-            }, this.eventEmitter, undefined, undefined);
+            }, this.eventEmitter);
         };
     }
 
@@ -314,7 +324,7 @@ export class AuthorizationServer {
                 return;
             }
 
-            const {grant_type} = req.body;
+            const {grant_type, scope} = req.body;
 
             if (!grant_type)
                 return error(res, {
@@ -332,17 +342,33 @@ export class AuthorizationServer {
                 });
             }
 
-            imp.function(req, {...this.options}, this.issueRefreshToken, (response, err) => {
+            // Validate scopes
+            let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
+            if (!(await this.options.isScopesValid(scopes))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
+                return error(res, {
+                    error: 'invalid_scope',
+                    error_description: 'One or more scopes are not acceptable',
+                    error_uri: this.options.errorUri,
+                });
+            }
+
+            imp.function({
+                req,
+                serverOpts: this.options,
+                issueRefreshToken: this.issueRefreshToken,
+                scopes
+            }, (response, err) => {
                 if (err)
                     return error(res, {
                         error: err.error,
                         error_description: err.error_description,
-                        error_uri: err.error_uri ? err.error_uri : this.options.errorUri,
+                        error_uri: err.hasOwnProperty('error_uri') ? err.error_uri : this.options.errorUri,
                         status: err.status
                     });
 
                 res.header('Cache-Control', 'no-store').status(200).json(response);
-            }, this.eventEmitter, undefined, undefined);
+            }, this.eventEmitter);
         };
     }
 

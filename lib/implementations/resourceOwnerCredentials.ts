@@ -14,9 +14,9 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
         name: 'resource-owner-credentials',
         endpoint: 'token',
         matchType: 'password',
-        function: async (req, serverOpts, issueRefreshToken, callback, eventEmitter) => {
-            let {client_id, client_secret} = (serverOpts.getClientCredentials as any)(req);
-            const {scope, username, password} = req.body;
+        function: async (data, callback, eventEmitter) => {
+            let {client_id, client_secret} = (data.serverOpts.getClientCredentials as any)(data.req);
+            const {scope, username, password} = data.req.body;
 
             if(!username)
                 return callback(undefined, {
@@ -30,9 +30,9 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
                     error_description: 'Body parameter password is missing'
                 });
 
-            let scopes = scope?.split(serverOpts.scopeDelimiter) || [];
-            if (!(await serverOpts.isScopesValid(scopes))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SCOPES_INVALID, req);
+            let scopes = scope?.split(data.serverOpts.scopeDelimiter) || [];
+            if (!(await data.serverOpts.isScopesValid(scopes))) {
+                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable'
@@ -41,7 +41,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
 
             // Do database request at last to lessen db costs.
             if (!(await opts.validateClient(client_id, client_secret))) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_CLIENT_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',
                     error_description: 'Client authentication failed'
@@ -50,7 +50,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
 
             let user = await opts.validateUser(username, password);
             if (!user) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_USER_INVALID, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_USER_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
                     error_description: 'User authentication failed'
@@ -58,21 +58,21 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             }
 
             // Generate access & refresh tokens
-            let tokens = await generateARTokens({user}, client_id, scopes, serverOpts, issueRefreshToken);
+            let tokens = generateARTokens({user}, client_id, scopes, data.serverOpts, data.issueRefreshToken);
 
             // Database save
-            let dbRes = await serverOpts.saveTokens({
+            let dbRes = await data.serverOpts.saveTokens({
                 accessToken: tokens.access_token,
-                accessTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.accessTokenLifetime!, 'access'),
+                accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                 refreshToken: tokens.refresh_token,
-                refreshTokenExpiresAt: getTokenExpiresAt(tokens, serverOpts.refreshTokenLifetime!, 'refresh'),
+                refreshTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.refreshTokenLifetime!, 'refresh'),
                 clientId: client_id,
                 user,
                 scopes,
             });
 
             if(!dbRes) {
-                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SAVE_ERROR, req);
+                eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error',

@@ -15,11 +15,14 @@ export interface Implementation {
      * * token: There is no user interaction, or the user has provided their credentials to the client.
      * * device: There is no user interaction, this endpoint will be used for the device flow.
      *
-     * During authorization the following checks will be made:
+     * The authorization endpoint will make the following checks:
      * * validateRedirectURI
      * * isTemporaryUnavailable
      * * rejectEmbeddedWebViews
      * * isGrantTypeAllowed
+     * * isScopesValid
+     *
+     * The device endpoint will make the following checks:
      * * isScopesValid
      */
     endpoint: 'authorize' | 'token' | 'device';
@@ -34,16 +37,18 @@ export interface Implementation {
      * @param serverOpts The authorization server's options that was passed while creating the server.
      * @param callback The callback that will provide the answer to the client. In endpoint authorize, state
      *                  will automatically be added, so there is no need to include it in your response.
-     * @param scopes Only for endpoint 'authorize', the scopes that was requested.
+     * @param scopes Only for endpoint 'authorize' & 'device', the scopes that was requested.
      * @param user Only for endpoint 'authorize', the user's identification.
      */
     function: (
-        req: any,
-        serverOpts: Required<AuthorizationServerOptions>,
-        issueRefreshToken: boolean,
+        data: {
+            req: any;
+            serverOpts: Required<AuthorizationServerOptions>,
+            issueRefreshToken: boolean,
+            scopes?: string[],
+            user?: any,
+        },
         callback: (response?: object, err?: OAuth2Error & {status?: number; } & object) => void,
-        eventEmitter: EventEmitter,
-        scopes: string[] | undefined,
-        user: any | undefined,
+        eventEmitter: EventEmitter
     ) => void | Promise<void>;
 }
