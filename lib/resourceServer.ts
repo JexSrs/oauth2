@@ -28,9 +28,13 @@ export class ResourceServer {
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *              then the authentication will fail. If scope is not initialized then the scope
      *              check will be omitted.
+     * @param cond If more than one scopes are provided, whether the access token must have all of them
+     *              or at least one of them.
      */
-    public authenticate(scope?: string | string[]): ExpressMiddleware {
-        let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
+    public authenticate(scope?: string | string[], cond?: 'all' | 'some'): ExpressMiddleware {
+        let scopes: string[] | undefined = Array.isArray(scope) ? scope : (scope ? [scope] : undefined);
+        let condition = cond || 'all';
+
         return (req, res, next) => {
             let token = this.options.getToken(req);
 
@@ -49,20 +53,25 @@ export class ResourceServer {
                     });
 
                 // Check scopes
-                if (scopes && data.scope.split(this.options.scopeDelimiter).some((v: string) => !scopes!.includes(v))) {
-                    return error(res, {
-                        error: 'insufficient_scope',
-                        error_description: 'Client does not have access to this endpoint',
-                        error_uri: this.options.errorUri,
-                        status: 403,
-                        noCache: false
-                    });
+                if(scopes) {
+                    if(
+                        (condition === 'all' && data.scope.split(this.options.scopeDelimiter).some((v: string) => !scopes!.includes(v)))
+                        || (condition === 'some' && data.scope.split(this.options.scopeDelimiter).some((v: string) => scopes!.includes(v)))
+                    )
+                        return error(res, {
+                            error: 'insufficient_scope',
+                            error_description: 'Client does not have access to this endpoint',
+                            error_uri: this.options.errorUri,
+                            status: 403,
+                            noCache: false
+                        });
                 }
 
                 this.options.setPayloadLocation(req, response.data)
                 next();
             }).catch(e => {
                 // Unexpected errors
+                console.log(e);
                 error(res, {
                     error: 'server_error',
                     error_description: 'Authorization server is not responding or is not reachable.',

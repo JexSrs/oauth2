@@ -66,6 +66,15 @@ export type AuthorizationServerOptions = {
      */
     getClientCredentials?: 'header' | 'body' | 'query' | ((req: any) => { client_id?: string | null; client_secret?: string | null; });
     /**
+     * Get an identification of the user that was authenticated in this request.
+     * This will be included in payloads so do not add sensitive data.
+     * Return null, if the user did not authorize the request.
+     * Defaults to req.user
+     * @param req The request instance.
+     * @return {any} The user's identification or null to deny access.
+     */
+    getUser?: (req: any) => any;
+    /**
      * Validate that the redirect uri that was passed during authorization is
      * registered matches the client's redirect uris.
      * @param client_id
@@ -73,14 +82,6 @@ export type AuthorizationServerOptions = {
      * @return {boolean} True if validation succeeds, false otherwise.
      */
     validateRedirectURI: (client_id: string, redirect_uri: string) => Promise<boolean>;
-    /**
-     * Get an identification of the user that was authenticated in this request.
-     * This will be included in payloads so do not add sensitive data.
-     * Return null, if the user did not authorize the request.
-     * @param req The request instance.
-     * @return {any} The user's identification or null to deny access.
-     */
-    getUser: (req: any) => any;
     /**
      * A function that asks if the passed scopes are valid. Not if permitted, this will be handled by the user.
      * If no scopes where send with the request then this function will be called once with an empty array.

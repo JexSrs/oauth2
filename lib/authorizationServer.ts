@@ -81,6 +81,9 @@ export class AuthorizationServer {
                 return {client_id, client_secret};
             };
 
+        if(typeof opts.getUser === undefined)
+            opts.getUser = (req) => req.user;
+
         this.options = opts as Required<AuthorizationServerOptions>;
     }
 
@@ -380,9 +383,13 @@ export class AuthorizationServer {
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *              then the authentication will fail. If scope is not initialized then the scope
      *              check will be omitted.
+     * @param cond If more than one scopes are provided, whether the access token must have all of them
+     *              or at least one of them.
      */
-    public authenticate(scope?: string | string[]): ExpressMiddleware {
-        let scopes: string[] | undefined = Array.isArray(scope) ? scope : scope?.split(/, */);
+    public authenticate(scope?: string[] | string, cond?: 'all' | 'some'): ExpressMiddleware {
+        let scopes: string[] | undefined = Array.isArray(scope) ? scope : (scope ? [scope] : undefined);
+        let condition = cond || 'all';
+
         return async (req, res, next) => {
             let token = this.options.getToken(req);
             if (!token) {
@@ -418,15 +425,20 @@ export class AuthorizationServer {
                 });
             }
 
-            if (scopes && payload.scopes.some((v: string) => !scopes!.includes(v))) {
-                this.eventEmitter.emit(Events.AUTHENTICATION_SCOPES_INVALID, req);
-                return error(res, {
-                    error: 'insufficient_scope',
-                    error_description: 'Client does not have access to this endpoint',
-                    error_uri: this.options.errorUri,
-                    status: 403,
-                    noCache: false
-                });
+            if (scopes) {
+                if(
+                    (condition === 'all' && payload.scopes.some((v: string) => !scopes!.includes(v)))
+                    || (condition === 'some' && payload.scopes.some((v: string) => scopes!.includes(v)))
+                ) {
+                    this.eventEmitter.emit(Events.AUTHENTICATION_SCOPES_INVALID, req);
+                    return error(res, {
+                        error: 'insufficient_scope',
+                        error_description: 'Client does not have access to this endpoint',
+                        error_uri: this.options.errorUri,
+                        status: 403,
+                        noCache: false
+                    });
+                }
             }
 
             let dbToken = await this.options.getAccessToken({

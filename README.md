@@ -93,7 +93,8 @@ authServer.use(authorizationCode({/* options */}));
 
 #### Options
 The authorization flow has extra options. For more details go see the
-[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
+[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts)
+and [`Common`](./lib/components/common.ts) options.
 
 #### Passport
 This library is compatible with passport authorization code flow.
@@ -110,7 +111,8 @@ authServer.use(clientCredentials({/* options */}));
 
 #### Options
 The client credentials flow has extra options. For more details go see the
-[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts).
+[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts)
+and [`Common`](./lib/components/common.ts) options.
 
 ###  Device flow
 
@@ -145,7 +147,8 @@ authServer.use(refreshToken({/* options */}));
 
 #### Options
 The refresh token flow has extra options. For more details go see the
-[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts).
+[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts)
+and [`Common`](./lib/components/common.ts) options.
 
 ### Resource owner credentials
 
@@ -157,7 +160,8 @@ authServer.use(resourceOwnerCredentials({/* options */}));
 
 #### Options
 The resource owner credentials flow has extra options. For more details go see the
-[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts).
+[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts)
+and [`Common`](./lib/components/common.ts) options.
 
 ### Add custom
 The authorization server can support flows that are not accompanied from this library.
@@ -254,16 +258,118 @@ at authorization.
 * `AUTHENTICATION_SCOPES_INVALID`: The scopes of the access token are insufficient.
 
 ## Endpoints
+The authorization server provides some endpoints that will be assigned to your Express server.
+For example:
+```javascript
+app.get('/oauth/v2/authorize', authServer.authorize());
+```
 
 ### Authorize
+The authorization endpoint. This endpoint is called when the user is authorizing the application.
+In this endpoint you have to authenticate the user before reaching the `authorize` function.
+For example:
+
+```javascript
+app.get('/oauth/v2/authorize', function (req, res, next) {
+    if(userAuthenticated(req)) {
+        req.user = {/* user's identification */};
+        next();
+    }
+    
+    res.end('User is not authenticated.');
+}, authServer.authorize());
+```
+
+The authorization endpoint must be accessed with the method `GET` and all data are accessed
+from the query.
+
+Before reaching the desired implementation, the authorization endpoint will call the following
+functions, so that it can to some basic checks:
+* validateRedirectURI
+* isTemporaryUnavailable
+* rejectEmbeddedWebViews
+* isGrantTypeAllowed
+* isScopesValid
+
+All these functions are initialized at the [AuthorizationServerOptions](#options)
 
 ### Token
+The token endpoint. This endpoint is called from the client directly without the need to
+authorize the user. Each flow will require the user to identify itself (e.x. `client_secret`).
+For example:
+
+```javascript
+app.post('/oauth/v2/token', authServer.token());
+```
+
+The token endpoint must be accessed with the method `POST` and all data are accessed
+from the body. The oauth2 specifies that the data are in query form (e.x. `name=mike&age=16`),
+so you have to use the `urlEncoded` body parser with `extended` set to `true`.
+
+```javascript
+app.post('/oauth/v2/token',
+    express.urlencoded({type: "application/x-www-form-urlencoded", extended: true}),
+    authServer.token());
+```
+or
+```javascript
+app.use(express.urlencoded({type: "application/x-www-form-urlencoded", extended: true}));
+app.post('/oauth/v2/token', authServer.token());
+```
 
 ### Device
+The device endpoint. Like token, this endpoint will be called from the client directly
+without the need to authorize the user. This endpoint is used for the first phase of the device flow.
+
+```javascript
+app.post('/oauth/v2/device', authServer.device());
+```
+
+The device endpoint must be accessed with the method `POST` and all data are accessed
+from the body.
 
 ### Introspection
+The introspection endpoint. Unlike the others, this endpoint is used by the resource server(s)
+and is meant to be private to only them. When a request arrives to the resource server to access
+a protected content, the resource server will send the token that accompanies the request to
+the authorization server and ask if it is valid. The authorization server will respond with
+a json that contains if it is `active` and some other information about the token.
+
+```javascript
+app.post('/oauth/v2/introspection', authServer.introspection());
+```
+
+The introspection endpoint must be accessed with the method `POST` and all data are accessed
+from the body.
 
 ### Authenticate
+This is more like a functionality and not an endpoint. There are cases where the
+authorization server and the resource server are one and the same. In these case, the
+function `authenticate` will act as a middleware to authenticate the request before accessing
+the protected content.
+
+```javascript
+app.get('/protected', authServer.authenticate(), function (req, res) {
+    // ...
+});
+```
+
+This function does not limit the used method.
+
+If you want to authenticate a protected resource based on a specific scope then
+pass as the first argument the scopes you want to be required.
+
+```javascript
+authServer.authenticate('scope1');
+```
+or with multiple scopes
+```javascript
+// Access token must have all scopes present
+authServer.authenticate(['scope1', 'scope2', 'scope3'], 'all'); // Default
+
+// Access token must have at least one of them.
+authServer.authenticate(['scope1', 'scope2', 'scope3'], 'some');
+```
 
 # Resource server
 
