@@ -69,7 +69,7 @@ const authServer = new AuthorizationServer({/* options */});
 
 The authorization server has globalized some options that are needed for almost
 all the implementations. For more details go see the
-[`AuthorizationServerOptions`](./lib/components/options/authorizationServerOptions.ts).
+[`AuthorizationServerOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
 
 ## Implementations
 `Implementation` is an oauth flow the authorization server supports.
@@ -93,7 +93,7 @@ authServer.use(authorizationCode({/* options */}));
 
 #### Options
 The authorization flow has extra options. For more details go see the
-[`AuthorizationCodeOptions`](./lib/components/options/implementations/authorizationCodeOptions.ts).
+[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
 
 #### Passport
 This library is compatible with passport authorization code flow.
@@ -110,7 +110,7 @@ authServer.use(clientCredentials({/* options */}));
 
 #### Options
 The client credentials flow has extra options. For more details go see the
-[`ClientCredentialsOptions`](./lib/components/options/implementations/clientCredentialsOptions.ts).
+[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts).
 
 ###  Device flow
 
@@ -122,7 +122,7 @@ authServer.use(deviceFlow({/* options */}));
 
 #### Options
 The device flow has extra options. For more details go see the
-[`DeviceFlowOptions`](./lib/components/options/implementations/deviceFlowOptions.ts).
+[`DeviceFlowOptions`](./lib/implementations/deviceFlow/deviceFlowOptions.ts).
 
 ### Implicit
 
@@ -145,7 +145,7 @@ authServer.use(refreshToken({/* options */}));
 
 #### Options
 The refresh token flow has extra options. For more details go see the
-[`RefreshTokenOptions`](./lib/components/options/implementations/refreshTokenOptions.ts).
+[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts).
 
 ### Resource owner credentials
 
@@ -157,7 +157,7 @@ authServer.use(resourceOwnerCredentials({/* options */}));
 
 #### Options
 The resource owner credentials flow has extra options. For more details go see the
-[`ResourceOwnerCredentialsOptions`](./lib/components/options/implementations/resourceOwnerCredentialsOptions.ts).
+[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts).
 
 ### Add custom
 The authorization server can support flows that are not accompanied from this library.
