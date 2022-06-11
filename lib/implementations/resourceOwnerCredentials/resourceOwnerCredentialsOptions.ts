@@ -1,4 +1,4 @@
-import {Common} from "./common";
+import {Common} from "../../components/common";
 
 export type ResourceOwnerCredentialsOptions = {
     /**

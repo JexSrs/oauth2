@@ -1,5 +1,5 @@
-import {THRefreshTokenAsk} from "../../types";
-import {Common} from "./common";
+import {THRefreshTokenAsk} from "../../components/types";
+import {Common} from "../../components/common";
 
 export type RefreshTokenOptions = {
     /**

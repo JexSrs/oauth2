@@ -92,6 +92,10 @@ let servers = [
 ];
 setTimeout(() => servers.forEach(s => s.close()), 60 * 1000);
 
+
+// TODO - https://www.passportjs.org/packages/passport-oauth2-client-password/
+// TODO - https://www.passportjs.org/packages/passport-oauth2-resource-owner-password/
+
 describe("Passport", function () {
     this.timeout(10 * 1000);
 
@@ -99,7 +103,7 @@ describe("Passport", function () {
     const cookieJar = new tough.CookieJar();
 
     let tokens;
-    it('Request tokens', () => {
+    it('Authorization code flow', () => {
         return axios.get(DATA.CLIENT_URL + '/login', {
             jar: cookieJar,
             withCredentials: true

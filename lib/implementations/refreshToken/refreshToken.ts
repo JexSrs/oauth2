@@ -1,8 +1,8 @@
-import {Implementation} from "../components/implementation";
-import {generateARTokens, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
-import {RefreshTokenOptions} from "../components/options/implementations/refreshTokenOptions";
-import {defaultCommonOpts} from "../modules/utils";
-import {Events} from "../components/events";
+import {Implementation} from "../../components/implementation";
+import {generateARTokens, verifyToken, getTokenExpiresAt} from "../../modules/tokenUtils";
+import {RefreshTokenOptions} from "./refreshTokenOptions";
+import {defaultCommonOpts} from "../../modules/utils";
+import {Events} from "../../components/events";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
     let opts = {...options, ...defaultCommonOpts(options)};

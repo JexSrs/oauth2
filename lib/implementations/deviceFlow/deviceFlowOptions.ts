@@ -1,4 +1,4 @@
-import {DFCodeAsk, DFCodeSave} from "../../types";
+import {DFCodeAsk, DFCodeSave} from "../../components/types";
 
 export type DeviceFlowOptions = {
     /**

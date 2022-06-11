@@ -1,8 +1,8 @@
-import {Implementation} from "../components/implementation";
-import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../modules/tokenUtils";
-import {codeChallengeHash, defaultCommonOpts} from "../modules/utils";
-import {AuthorizationCodeOptions} from "../components/options/implementations/authorizationCodeOptions";
-import {Events} from "../components/events";
+import {Implementation} from "../../components/implementation";
+import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../../modules/tokenUtils";
+import {codeChallengeHash, defaultCommonOpts} from "../../modules/utils";
+import {AuthorizationCodeOptions} from "./authorizationCodeOptions";
+import {Events} from "../../components/events";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
     let opts = {...options, ...defaultCommonOpts(options)};

@@ -1,9 +1,9 @@
 # OAuth2
 **OAuth2 | Various Implementations for open authorization**
 
-This is a TypeScript implementation of OAuth2 as documented at RFC6749.
-The [OAuth 2.0 Simplified](https://www.oauth.com/) was a significant help, while developing
-this library, many thanks.
+This is a TypeScript implementation of OAuth2 as documented at [RFC6749](https://datatracker.ietf.org/doc/html/rfc6749).
+Many thanks to the [OAuth 2.0 Simplified](https://www.oauth.com/) website. It was a significant help while developing
+this library.
 You can see with more detail the specs that was used below:
 
 * OAuth 2.0 Core: [RFC6749](https://datatracker.ietf.org/doc/html/rfc6749)
@@ -36,6 +36,7 @@ Some more SPECS will be implemented in the feature from [here](https://www.oauth
         * [Options](#options-5)
     * [Resource owner credentials](#resource-owner-credentials)
       * [Options](#options-6)
+    * [Add custom](#add-custom)
   * [Events](#events)
   * [Endpoints](#endpoints)
     * [Authorize](#authorize)
@@ -55,38 +56,202 @@ Some more SPECS will be implemented in the feature from [here](https://www.oauth
 ```
 
 # Authorization server
+The core of this library, it will create `Express` middlewares that will be attached
+to your server and handle the oauth requests.
+
+```javascript
+import {AuthorizationServer} from "oauth2";
+
+const authServer = new AuthorizationServer({/* options */});
+```
 
 ## Options
 
+The authorization server has globalized some options that are needed for almost
+all the implementations. For more details go see the
+[`AuthorizationServerOptions`](./lib/components/options/authorizationServerOptions.ts).
+
 ## Implementations
+`Implementation` is an oauth flow the authorization server supports.
+The authorization server has an abstract form, this helps to add more
+implementations without needing to edit the server itself.
+
+To add an implementation to the server:
+```javascript
+authServer.use(implementation);
+```
+
+Below you can see the supported oauth flows:
 
 ### Authorization code
 
+```javascript
+import {authorizationCode} from "oauth2";
+
+authServer.use(authorizationCode({/* options */}));
+```
+
 #### Options
+The authorization flow has extra options. For more details go see the
+[`AuthorizationCodeOptions`](./lib/components/options/implementations/authorizationCodeOptions.ts).
 
 #### Passport
+This library is compatible with passport authorization code flow.
+For more information about passport see [Passport.js](https://www.passportjs.org/)
+and [passport-oauth2](https://www.passportjs.org/packages/passport-oauth2/).
 
 ### Client credentials
 
+```javascript
+import {clientCredentials} from "oauth2";
+
+authServer.use(clientCredentials({/* options */}));
+```
+
 #### Options
+The client credentials flow has extra options. For more details go see the
+[`ClientCredentialsOptions`](./lib/components/options/implementations/clientCredentialsOptions.ts).
 
 ###  Device flow
 
+```javascript
+import {deviceFlow} from "oauth2";
+
+authServer.use(deviceFlow({/* options */}));
+```
+
 #### Options
+The device flow has extra options. For more details go see the
+[`DeviceFlowOptions`](./lib/components/options/implementations/deviceFlowOptions.ts).
 
 ### Implicit
 
+```javascript
+import {implicit} from "oauth2";
+
+authServer.use(implicit({/* options */}));
+```
+
 #### Options
+The implicit flow does not have extra options.
 
 ### Refresh token
 
+```javascript
+import {refreshToken} from "oauth2";
+
+authServer.use(refreshToken({/* options */}));
+```
+
 #### Options
+The refresh token flow has extra options. For more details go see the
+[`RefreshTokenOptions`](./lib/components/options/implementations/refreshTokenOptions.ts).
 
 ### Resource owner credentials
 
+```javascript
+import {resourceOwnerCredentials} from "oauth2";
+
+authServer.use(resourceOwnerCredentials({/* options */}));
+```
+
 #### Options
+The resource owner credentials flow has extra options. For more details go see the
+[`ResourceOwnerCredentialsOptions`](./lib/components/options/implementations/resourceOwnerCredentialsOptions.ts).
+
+### Add custom
+The authorization server can support flows that are not accompanied from this library.
+To create one you have to inherit the [`Implementation`](./lib/components/implementation.ts) interface.
 
 ## Events
+With the help of Node.js [`Event Emitter`](https://nodejs.dev/learn/the-nodejs-event-emitter),
+the authorization library emits some useful events. You can listen to those events
+using:
+
+```javascript
+import {Events} from "oauth2";
+
+authServer.on(Events.AUTHORIZATION_REDIRECT_URI_INVALID, function (req) {
+    // ...
+});
+```
+
+Each event is accompanied by the request instance of current request.
+For example this can be used for logging, or checking if an
+authorization code is used twice.
+
+**Caution!** this can be a security problem if not handled right, because it
+may expose credentials such as `client_id`, `client_secret`, `access tokens` or
+`refresh tokens`.
+
+### Authorization endpoint
+* `AUTHORIZATION_REDIRECT_URI_INVALID`: If the client passes an invalid redirect uri
+at authorization.
+* `AUTHORIZATION_SCOPES_INVALID`: The scopes the client passed are not valid.
+* `AUTHORIZATION_USERGAENT_INVALID`: The user agent did not pass the checks (embedded web view, bot).
+* `AUTHORIZATION_RESPONSE_TYPE_UNSUPPORTED`: The client asked for an implementation at the authorization endpoint that does not exist.
+* `AUTHORIZATION_RESPONSE_TYPE_REJECT`: The client is no eligible for this implementation.
+
+#### Authorization Code
+* `AUTHORIZATION_FLOWS_CODE_PKCE_INVALID`: PKCE arguments were missing or invalid.
+* `AUTHORIZATION_FLOWS_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+#### Implicit
+* `AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+### Token endpoint
+* `TOKEN_GRANT_TYPE_UNSUPPORTED`: The client asked for an implementation at the token endpoint that does not exist.
+
+#### Authorization Code
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_JWT_INVALID`: The authorization code did not pass the JWT authentication (expired or invalid).
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_CLIENT_INVALID`: The authorization code does not belong to the client_id.
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID`: The authorization code not found in the database.
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_REDIRECT_URI_INVALID`: The redirect uri is not the same as the one that generated the authorization code.
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID`: The PKCE protection failed.
+* `TOKEN_FLOWS_AUTHORIZATION_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+#### Client credentials
+* `TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID`: The scopes the client passed are not valid.
+* `TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
+* `TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+#### Device flow
+* `TOKEN_FLOWS_DEVICE_CODE_SLOW_DOWN`: The client made a request too early.
+* `TOKEN_FLOWS_DEVICE_CODE_DEVICE_CODE_INVALID`: Device code not found in database.
+* `TOKEN_FLOWS_DEVICE_CODE_EXPIRED`: The client made a request and the response was `expired_token`.
+* `TOKEN_FLOWS_DEVICE_CODE_PENDING`: The client made a request and the response was `authorization_pending`.
+* `TOKEN_FLOWS_DEVICE_CODE_ACCESS_DENIED`: The client made a request and the response was `access_denied` (the user denied the authorization).
+* `TOKEN_FLOWS_DEVICE_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+#### Resource owner credentials
+* `TOKEN_FLOWS_PASSWORD_SCOPES_INVALID`: The scopes the client passed are not valid.
+* `TOKEN_FLOWS_PASSWORD_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
+* `TOKEN_FLOWS_PASSWORD_USER_INVALID`: User sent invalid credentials
+* `TOKEN_FLOWS_PASSWORD_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+#### Refresh token
+* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID`: The refresh token did not pass the JWT authentication.
+* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN`: The passed token was not a refresh token.
+* `TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID`: The scopes the client passed are not valid.
+* `TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID`: The refresh token does not belong to client id, or client authentication failed.
+* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID`: The refresh token not found in the database.
+* `TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+
+### Device endpoint
+* `DEVICE_GRANT_TYPE_UNSUPPORTED`: The client asked for an implementation at the device endpoint that does not exist.
+* `DEVICE_SCOPES_INVALID`: The scopes the client passed are not valid.
+
+#### Device flow
+* `DEVICE_FLOWS_TOKEN_CLIENT_INVALID`: Client did not pass authentication (`client_id` not registered).
+* DEVICE_FLOWS_TOKEN_SAVE_ERROR: Function `saveTokens` returned false (did not succeed).
+
+### Authentication endpoint
+* `AUTHENTICATION_TOKEN_MISSING`: No token provided when authenticating a request.
+* `AUTHENTICATION_TOKEN_JWT_EXPIRED`: The access token did not pass the JWT authentication.
+* `AUTHENTICATION_TOKEN_DB_EXPIRED`: The access token not found in the database.
+* `AUTHENTICATION_TOKEN_NOT_ACCESS_TOKEN`: The token is not an access token.
+* `AUTHENTICATION_SCOPES_INVALID`: The scopes of the access token are insufficient.
 
 ## Endpoints
 

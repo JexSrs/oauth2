@@ -27,8 +27,11 @@ export enum Events {
     TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID = 'token.flows.client-credentials.client.invalid',
     TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR = 'token.flows.client-credentials.save.error',
     // Token flow "urn:ietf:params:oauth:grant-type:device_code"
-    TOKEN_FLOWS_DEVICE_CODE_SCOPES_INVALID = 'token.flows.device-code.scopes.invalid',
-    TOKEN_FLOWS_DEVICE_CODE_CLIENT_INVALID = 'token.flows.device-code.client.invalid',
+    TOKEN_FLOWS_DEVICE_CODE_SLOW_DOWN = 'token.flows.device-code.slow-down',
+    TOKEN_FLOWS_DEVICE_CODE_DEVICE_CODE_INVALID = 'token.flows.device-code.device-code.invalid',
+    TOKEN_FLOWS_DEVICE_CODE_EXPIRED = 'token.flows.device-code.expired',
+    TOKEN_FLOWS_DEVICE_CODE_PENDING = 'token.flows.device-code.pending',
+    TOKEN_FLOWS_DEVICE_CODE_ACCESS_DENIED = 'token.flows.device-code.access-denied',
     TOKEN_FLOWS_DEVICE_CODE_SAVE_ERROR = 'token.flows.device-code.save.error',
     // Token flow "password"
     TOKEN_FLOWS_PASSWORD_SCOPES_INVALID = 'token.flows.password.scopes.invalid',
@@ -36,23 +39,20 @@ export enum Events {
     TOKEN_FLOWS_PASSWORD_USER_INVALID = 'token.flows.password.user.invalid',
     TOKEN_FLOWS_PASSWORD_SAVE_ERROR = 'token.flows.password.save.error',
     // Token flow "refresh_token"
-    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID = 'token.flows.token.token.jwt-invalid',
-    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN = 'token.flows.token.not-refresh-token',
-    TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID = 'token.flows.token.scopes.invalid',
-    TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID = 'token.flows.token.client.invalid',
-    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID = 'token.flows.token.token.db-invalid',
-    TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR = 'token.flows.token.save.error',
+    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID = 'token.flows.refresh-token.token.jwt-invalid',
+    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN = 'token.flows.refresh-token.not-refresh-token',
+    TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID = 'token.flows.refresh-token.scopes.invalid',
+    TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID = 'token.flows.refresh-token.client.invalid',
+    TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID = 'token.flows.refresh-token.token.db-invalid',
+    TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR = 'token.flows.refresh-token.save.error',
 
 
     // Device
     DEVICE_GRANT_TYPE_UNSUPPORTED = 'device.grant-type.unsupported',
+    DEVICE_SCOPES_INVALID = 'device.scopes.invalid',
     // Device flow "token"
-    DEVICE_FLOWS_TOKEN_SLOW_DOWN = 'device.flows.token.slow-down',
-    DEVICE_FLOWS_TOKEN_DEVICE_CODE_INVALID = 'device.flows.token.device-code.invalid',
-    DEVICE_FLOWS_TOKEN_EXPIRED = 'device.flows.token.expired',
-    DEVICE_FLOWS_TOKEN_PENDING = 'device.flows.token.pending',
-    DEVICE_FLOWS_TOKEN_ACCESS_DENIED = 'device.flows.token.access-denied',
-    DEVICE_FLOWS_TOKEN_SAVE_ERROR = 'device.flows.token.save.error',
+    DEVICE_FLOWS_TOKEN_CLIENT_INVALID = 'token.flows.device-code.client.invalid',
+    DEVICE_FLOWS_TOKEN_SAVE_ERROR = 'token.flows.device-code.save.error',
 
 
     // Authentication

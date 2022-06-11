@@ -1,5 +1,5 @@
-import {THAuthorizationCodeAsk, THAuthorizationCodeSave} from "../../types";
-import {Common} from "./common";
+import {THAuthorizationCodeAsk, THAuthorizationCodeSave} from "../../components/types";
+import {Common} from "../../components/common";
 
 export type AuthorizationCodeOptions = {
     /**

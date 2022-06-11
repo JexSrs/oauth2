@@ -33,19 +33,21 @@ export interface Implementation {
     matchType: string;
     /**
      * The function that will be called when the matchType is sent by the client.
-     * @param req The request instance, to get any existing or extra information that may be needed.
-     * @param serverOpts The authorization server's options that was passed while creating the server.
+     * @param data Objects needed for the implementation.
      * @param callback The callback that will provide the answer to the client. In endpoint authorize, state
      *                  will automatically be added, so there is no need to include it in your response.
-     * @param scopes Only for endpoint 'authorize' & 'device', the scopes that was requested.
-     * @param user Only for endpoint 'authorize', the user's identification.
      */
     function: (
         data: {
+            /** The request instance, to get any existing or extra information that may be needed. */
             req: any;
+            /** The authorization server's options that was passed while creating the server. */
             serverOpts: Required<AuthorizationServerOptions>,
+            /** Whether a refresh token will be issued. */
             issueRefreshToken: boolean,
+            /** Only for endpoint 'authorize' & 'device', the scopes that was requested. */
             scopes?: string[],
+            /** Only for endpoint 'authorize', the user's identification. */
             user?: any,
         },
         callback: (response?: object, err?: OAuth2Error & {status?: number; } & object) => void,

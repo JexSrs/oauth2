@@ -347,7 +347,7 @@ export class AuthorizationServer {
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
             if (!(await this.options.isScopesValid(scopes))) {
-                this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
+                this.eventEmitter.emit(Events.DEVICE_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable',
