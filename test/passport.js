@@ -1,50 +1,10 @@
 const chai = require('chai');
 const express = require('express');
-const passport = require('passport');
-const OAuth2Strategy = require('passport-oauth2');
-const DATA = require("./data");
+const passport = require('./data/passport_data');
+const DATA = require("./data/data");
 const axios = require("axios");
 const axiosCookieJarSupport = require('axios-cookiejar-support');
 const tough = require('tough-cookie');
-
-let clientDB = {};
-
-// Add passport strategy
-const strategy = new OAuth2Strategy({
-    authorizationURL: `${DATA.AUTHORIZATION_URL}/oauth/v2/authorize`,
-    tokenURL: `${DATA.AUTHORIZATION_URL}/oauth/v2/token`,
-    clientID: DATA.CLIENT_ID,
-    clientSecret: DATA.CLIENT_SECRET,
-    callbackURL: DATA.CLIENT_CALLBACK_URL,
-    passReqToCallback: true,
-    pkce: true,
-    state: true,
-}, function(req, accessToken, refreshToken, params, profile, cb) {
-    //console.log('GOT NEW DATA:', {accessToken, refreshToken, params, profile});
-    clientDB = {
-        id: 'user-id',
-        profile,
-        accessToken, refreshToken
-    };
-    cb(undefined, {
-        id: clientDB.id,
-        profile: clientDB.profile,
-        tokens: {
-            accessToken,
-            refreshToken
-        }
-    });
-});
-strategy.userProfile = function (accessToken, done) {
-    // Request user profile here using access token
-    done(null, {
-        name: 'name',
-        email: 'email'
-    });
-};
-passport.use(strategy);
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
 
 // Create client server
 const isLoggedIn = (req, res, next) => {
@@ -60,7 +20,8 @@ clientExpress.use(require('express-session')({ secret: 'keyboard cat', resave: t
 clientExpress.use(passport.initialize());
 clientExpress.use(passport.session());
 
-clientExpress.get('/login', passport.authenticate('oauth2', {scope: ['scope1']})); // Redirect to authorization server login page
+// Redirect to authorization server login page
+clientExpress.get('/login', passport.authenticate('oauth2', {scope: ['scope1']}));
 clientExpress.get('/auth/callback',
     function (req, res, next) {
         //console.log('CALLBACK:', req.query);

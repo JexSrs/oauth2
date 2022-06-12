@@ -39,7 +39,10 @@ export class ResourceServer {
             let token = this.options.getToken(req);
 
             axios.post(this.options.introspectionURL, {token}, {
-                headers: this.options.introspectionHeaders as any
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...this.options.introspectionHeaders, // Server may decide to change to url encoded or something
+                }
             }).then(response => {
                 const data = response.data;
 
@@ -78,7 +81,7 @@ export class ResourceServer {
                     error_description: 'Authorization server is not responding or is not reachable.',
                     error_uri: this.options.errorUri,
                     noCache: false,
-                    status: 400
+                    status: 503
                 })
             });
         };
