@@ -1,5 +1,5 @@
 const express = require('express');
-const DATA = require("./data");
+const DATA = require("./data/data");
 const {AuthorizationServer, implicit, clientCredentials, resourceOwnerCredentials, refreshToken, authorizationCode, deviceFlow, Events} = require("../dist");
 
 let authSrvDB = {};
@@ -132,6 +132,7 @@ authSrv.on(Events.TOKEN_FLOWS_DEVICE_CODE_PENDING, req => {
 // EXPRESS
 const authorizationExpress = express();
 authorizationExpress.use(express.urlencoded({type: "application/x-www-form-urlencoded", extended: true}));
+authorizationExpress.use(express.json({type: "application/json"}));
 
 authorizationExpress.get('/oauth/v2/authorize', function (req, res, next) {
     //console.log('AUTHORIZE:', req.query);
@@ -152,6 +153,12 @@ authorizationExpress.post('/oauth/v2/device', function (req, res, next) {
     // console.log(req)
     next();
 }, authSrv.device());
+
+authorizationExpress.post('/oauth/v2/introspection', function (req, res, next) {
+    //console.log('TOKEN:', req.body, req.query);
+    // console.log(req)
+    next();
+}, authSrv.introspection());
 
 authorizationExpress.get('/protected', authSrv.authenticate(), function (req, res) {
     res.status(200).end('protected-content');

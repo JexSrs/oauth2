@@ -1,5 +1,5 @@
 const axios = require("axios");
-const DATA = require("./data");
+const DATA = require("./data/data");
 const {buildQuery} = require("../dist/modules/utils");
 const chai = require("chai");
 

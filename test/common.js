@@ -1,6 +1,6 @@
 const chai = require('chai');
 const axios = require("axios");
-const DATA = require("./data");
+const DATA = require("./data/data");
 const express = require("express");
 const buildQuery = require("../dist/modules/utils").buildQuery;
 
