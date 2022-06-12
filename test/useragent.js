@@ -30,10 +30,6 @@ const iosValid = [
     'Mozilla/5.0 (Apple-iPhone7C2/1202.466; U; CPU like Mac OS X; en) AppleWebKit/420+ (KHTML, like Gecko) Version/3.0 Mobile/1A543 Safari/419.3',
 ];
 
-const iosInvalid = [
-
-];
-
 const androidValid = [
     // Samsung Galaxy S10
     'Mozilla/5.0 (Linux; Android 9; SM-G973U Build/PPR1.180610.011) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Mobile Safari/537.36',
@@ -133,10 +129,6 @@ const windowPhoneValid = [
     'Mozilla/5.0 (Windows Phone 10.0; Android 4.2.1; Microsoft; Lumia 950) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Mobile Safari/537.36 Edge/13.1058',
 ];
 
-const windowPhoneInvalid = [
-
-];
-
 const desktopsValid = [
     // Windows 10-based PC using Edge browser
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246',
@@ -209,10 +201,6 @@ describe("User Agent", function () {
         iosValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
 
-    it('IOS (Invalid)', () => {
-        iosInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
-    });
-
     it('Android (Valid)', () => {
         androidValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
     });
@@ -223,10 +211,6 @@ describe("User Agent", function () {
 
     it('Windows Phone (Valid)', () => {
         windowPhoneValid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(true));
-    });
-
-    it('Windows Phone (Invalid)', () => {
-        windowPhoneInvalid.forEach(ua => chai.expect(validateUserAgent(ua)).to.equal(false));
     });
 
     it('Desktops (Valid)', () => {
