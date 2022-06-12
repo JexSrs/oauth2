@@ -1,14 +1,16 @@
 import {Implementation} from "../../components/implementation";
 import {generateARTokens, getTokenExpiresAt} from "../../modules/tokenUtils";
 import {ResourceOwnerCredentialsOptions} from "./resourceOwnerCredentialsOptions";
-import {defaultCommonOpts} from "../../modules/utils";
 import {Events} from "../../components/events";
 
 export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOptions): Implementation {
-    let opts = {...options, ...defaultCommonOpts(options)};
+    let opts = {...options};
 
     if(typeof opts.validateUser !== 'function')
         throw new Error('validateUser is not a function');
+
+    if(typeof opts.validateClient !== 'function')
+        throw new Error('validateClient is not a function');
 
     return {
         name: 'resource-owner-credentials',
@@ -31,7 +33,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
                 });
 
             let scopes = scope?.split(data.serverOpts.scopeDelimiter) || [];
-            if (!(await data.serverOpts.isScopesValid(scopes))) {
+            if (!(await data.serverOpts.validateScopes(scopes))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',

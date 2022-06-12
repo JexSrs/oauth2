@@ -1,12 +1,21 @@
 import * as crypto from "crypto";
 import {OAuth2Error} from "../components/types";
 
+/**
+ * Will create a query string from an object.
+ * @param params
+ */
 export function buildQuery(params: { [key: string]: string | undefined }): string {
     return Object.keys(params).map(k => params[k] ? `${k}=${params[k]}` : undefined).filter(s => s != undefined).join('&');
 }
 
-export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: string): string {
-    let code = str;
+/**
+ * Will generate the code_challenge from the code verifier and code challenge method.
+ * @param method The code challenge method.
+ * @param verifier The code verifier.
+ */
+export function codeChallengeHash(method: 'plain' | 'S256' | undefined, verifier: string): string {
+    let code = verifier;
     if (method === 'S256') {
         // Hash
         code = crypto.createHash('sha256').update(code).digest('base64');
@@ -19,15 +28,10 @@ export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: str
     return code;
 }
 
-export function defaultCommonOpts(options: any) {
-    let opts = options || {};
-
-    if(typeof opts.validateClient !== 'function')
-        throw new Error('validateClient is not a function');
-
-    return opts;
-}
-
+/**
+ * Will generate a random string.
+ * @param length The length of the string.
+ */
 export function randStr(length: number): string {
     const chars = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890";
     const randomArray = Array.from({ length: length },
@@ -36,6 +40,12 @@ export function randStr(length: number): string {
     return randomArray.join("");
 }
 
+/**
+ * Will build and send the error response.
+ * If a redirect uri is provided, the response will be redirected.
+ * @param res
+ * @param data
+ */
 export function error(res: any, data: OAuth2Error & { redirect_uri?: string; state?: string; status?: number; noCache?: boolean }) {
     let wwwAuthHeader = `Bearer error="${data.error}"`;
     if (data.error_description) wwwAuthHeader += ` error_description="${data.error_description}"`;

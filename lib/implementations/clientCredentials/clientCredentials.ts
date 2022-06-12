@@ -1,11 +1,14 @@
 import {Implementation} from "../../components/implementation";
 import {generateARTokens, getTokenExpiresAt} from "../../modules/tokenUtils";
 import {ClientCredentialsOptions} from "./clientCredentialsOptions";
-import {defaultCommonOpts} from "../../modules/utils";
 import {Events} from "../../components/events";
 
 export function clientCredentials(options: ClientCredentialsOptions): Implementation {
-    let opts = {...options, ...defaultCommonOpts(options)};
+    let opts = {...options};
+
+    if(typeof opts.validateClient !== 'function')
+        throw new Error('validateClient is not a function');
+
     return {
         name: 'client-credentials',
         endpoint: 'token',
@@ -16,7 +19,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
 
             // Validate scopes
             let scopes = scope?.split(' ') || [];
-            if (!(await data.serverOpts.isScopesValid(scopes))) {
+            if (!(await data.serverOpts.validateScopes(scopes))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',

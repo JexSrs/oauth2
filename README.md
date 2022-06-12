@@ -93,8 +93,7 @@ authServer.use(authorizationCode({/* options */}));
 
 #### Options
 The authorization flow has extra options. For more details go see the
-[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts)
-and [`Common`](./lib/components/common.ts) options.
+[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
 
 #### Passport
 This library is compatible with passport authorization code flow.
@@ -111,8 +110,7 @@ authServer.use(clientCredentials({/* options */}));
 
 #### Options
 The client credentials flow has extra options. For more details go see the
-[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts)
-and [`Common`](./lib/components/common.ts) options.
+[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts).
 
 ###  Device flow
 
@@ -147,8 +145,7 @@ authServer.use(refreshToken({/* options */}));
 
 #### Options
 The refresh token flow has extra options. For more details go see the
-[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts)
-and [`Common`](./lib/components/common.ts) options.
+[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts).
 
 ### Resource owner credentials
 
@@ -160,8 +157,7 @@ authServer.use(resourceOwnerCredentials({/* options */}));
 
 #### Options
 The resource owner credentials flow has extra options. For more details go see the
-[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts)
-and [`Common`](./lib/components/common.ts) options.
+[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts).
 
 ### Add custom
 The authorization server can support flows that are not accompanied from this library.
@@ -272,7 +268,9 @@ For example:
 ```javascript
 app.get('/oauth/v2/authorize', function (req, res, next) {
     if(userAuthenticated(req)) {
-        req.user = {/* user's identification */};
+        if(userAuthorized(req))
+            req.user = {/* user's identification */};
+        else req.user = null;
         next();
     }
     
@@ -289,7 +287,7 @@ functions, so that it can to some basic checks:
 * isTemporaryUnavailable
 * rejectEmbeddedWebViews
 * isGrantTypeAllowed
-* isScopesValid
+* validateScopes
 
 All these functions are initialized at the [AuthorizationServerOptions](#options)
 

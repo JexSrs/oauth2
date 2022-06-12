@@ -1,11 +1,11 @@
 import {Implementation} from "../../components/implementation";
 import {generateARTokens, signToken, verifyToken, getTokenExpiresAt} from "../../modules/tokenUtils";
-import {codeChallengeHash, defaultCommonOpts} from "../../modules/utils";
+import {codeChallengeHash} from "../../modules/utils";
 import {AuthorizationCodeOptions} from "./authorizationCodeOptions";
 import {Events} from "../../components/events";
 
 export function authorizationCode(options: AuthorizationCodeOptions): Implementation[] {
-    let opts = {...options, ...defaultCommonOpts(options)};
+    let opts = {...options};
 
     if(opts.usePKCE === undefined)
         opts.usePKCE = true;
@@ -16,13 +16,9 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
     if(typeof opts.hashCodeChallenge !== 'function')
         opts.hashCodeChallenge = (code: string, method: string) => codeChallengeHash(method as any, code);
 
-    if(opts.allowCodeChallengeMethodPlain === undefined)
-        opts.allowCodeChallengeMethodPlain = false
-
     if(opts.authorizationCodeLifetime === undefined)
         opts.authorizationCodeLifetime = 60;
-    else if (typeof opts.authorizationCodeLifetime !== 'number'
-        || opts.authorizationCodeLifetime <= 0
+    else if (opts.authorizationCodeLifetime <= 0
         || Math.trunc(opts.authorizationCodeLifetime) !== opts.authorizationCodeLifetime)
         throw new Error('authorizationCodeLifetime is not positive integer.');
 
@@ -35,8 +31,8 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
     if(typeof opts.deleteAuthorizationCode !== 'function')
         throw new Error('deleteAuthorizationCode is not a function');
 
-    if(typeof opts.getIDTokenContent !== 'function')
-        opts.getIDTokenContent = (user: any) => null;
+    if(typeof opts.validateClient !== 'function')
+        throw new Error('validateClient is not a function');
 
     return [
         {
@@ -62,7 +58,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                             error_description: 'Query parameter code_challenge_method is missing',
                         });
                     }
-                    if (!opts.validCodeChallengeMethods.includes(code_challenge_method)) {
+                    if (!opts.validCodeChallengeMethods!.includes(code_challenge_method)) {
                         eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_request',
@@ -78,7 +74,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 // Save authorization code to database
                 let dbRes = await opts.saveAuthorizationCode({
                     authorizationCode: code,
-                    expiresAt: Math.trunc((Date.now() + opts.authorizationCodeLifetime * 1000) / 1000),
+                    expiresAt: Math.trunc((Date.now() + opts.authorizationCodeLifetime! * 1000) / 1000),
                     clientId: client_id,
                     scopes: data.scopes!,
                     user: data.user!,
@@ -180,7 +176,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
 
                 // Check PKCE
                 if (opts.usePKCE) {
-                    if((await opts.hashCodeChallenge(code_verifier, dbCode.codeChallengeMethod)) !== dbCode.codeChallenge) {
+                    if((await opts.hashCodeChallenge!(code_verifier, dbCode.codeChallengeMethod!)) !== dbCode.codeChallenge) {
                         eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID, data.req);
                         return callback(undefined, {
                             error: 'invalid_grant',

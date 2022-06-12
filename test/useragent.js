@@ -164,7 +164,6 @@ const gameConsolesValid = [
     'Mozilla/5.0 (Nintendo 3DS; U; ; en) Version/1.7412.EU'
 ];
 
-
 const otherValid = [
     // Chromecast
     'Mozilla/5.0 (CrKey armv7l 1.5.16041) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.0 Safari/537.36',

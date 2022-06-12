@@ -1,20 +1,30 @@
 export type ResourceServerOptions = {
     /**
-     * The authorization server url, where the resource servers ask
-     * to verify if a token is valid.
+     * The authorization server's introspection url.
+     * This is the url where the resource servers ask to verify if a token is valid.
      */
     introspectionURL: string;
     /**
-     * Override token location during authentication.
-     * Defaults to req.headers['authorization'].
+     * When authenticating a request from where to get the access token.
+     * It defaults to the authorization header:
+     * ```
+     * function getToken(req) {
+     *     return req.headers['authorization'];
+     * }
+     * ```
      * @param req The request instance.
-     * @return {string} The token that the client passed.
+     * @return {string|null} The token that the client passed or null if no token found.
      */
     getToken?: (req: any) => string;
     /**
-     * Override payload location (when the verification is complete where to save the verified payload,
-     * so it can be accessed later by the app). The payload will be an object that contains {client_id, user, scopes}.
-     * Defaults to req.payload.
+     * After the request is authenticated a payload that contains information about
+     * the client and user will be set. This function will decide its location.
+     * It defaults to 'payload':
+     * ```
+     * function setPayloadLocation(req, payload) {
+     *     req.payload = payload
+     * }
+     * ```
      * @param req The request instance.
      * @param payload The payload that will be saved at the request instance.
      */
@@ -27,12 +37,11 @@ export type ResourceServerOptions = {
     introspectionHeaders?: {[key: string]: string | string[]};
     /**
      * The delimiter that will be used to split the scope string.
-     * This has to match the authorization server scopeDelimiter.
      * Defaults to ' ' (one space character).
      */
     scopeDelimiter?: string;
     /**
-     * The error uri that will be passed with the response in case of error.
+     * The error uri that will be passed with the error response.
      */
     errorUri?: string;
 };

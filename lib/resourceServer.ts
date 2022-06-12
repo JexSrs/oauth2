@@ -25,6 +25,10 @@ export class ResourceServer {
 
     /**
      * This function will be used to authenticate a request.
+     * It will make a request to the authorization server to verify the validity of the access token.
+     *
+     * It is recommended to cache the response for this endpoint for short periods of time.
+     *
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *              then the authentication will fail. If scope is not initialized then the scope
      *              check will be omitted.

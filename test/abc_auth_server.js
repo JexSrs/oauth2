@@ -13,7 +13,7 @@ let authSrv = new AuthorizationServer({
     accessTokenLifetime: 60, // 1 minute
     refreshTokenLifetime: 120, // 2 minutes
     secret: 'SUPER-DUPER-SECRET',
-    isScopesValid: (scopes) => scopes.some(s => ['scope1', 'scope2'].includes(s)),
+    validateScopes: (scopes) => scopes.some(s => ['scope1', 'scope2'].includes(s)),
     getUser: req => req.loggedInUser,
     getAccessToken: data => {
         // console.log('GET ACCESS', authSrvDB.accessToken === data.accessToken)
@@ -29,9 +29,9 @@ let authSrv = new AuthorizationServer({
     validateRedirectURI: (client_id, redirect_uri) =>
         client_id === DATA.CLIENT_ID
         && [DATA.CLIENT_CALLBACK_URL, DATA.CLIENT_IMPLICIT_CALLBACK_URL].includes(redirect_uri),
-    isGrantTypeAllowed: (client_id, type) => true,
+    isImplementationAllowed: (client_id, type) => true,
     isTemporaryUnavailable: req => false,
-    validateUserAgent: (ua) => true,
+    validateRequest: (req) => true,
     setPayloadLocation: (req, payload) => req.payload = payload,
     getClientCredentials: 'body'
 });
