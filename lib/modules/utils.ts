@@ -19,20 +19,6 @@ export function codeChallengeHash(method: 'plain' | 'S256' | undefined, str: str
     return code;
 }
 
-export function validateUserAgent(useragent: string): boolean {
-    // Is IOS
-    if(/iphone|ipod|ipad/.test(useragent)) {
-        // Is not safari
-        if(!(/safari/.test(useragent)))
-            return false;
-    }
-
-    // Is Android
-    // TODO
-
-    return true;
-}
-
 export function defaultCommonOpts(options: any) {
     let opts = options || {};
 
