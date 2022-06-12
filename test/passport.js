@@ -21,8 +21,8 @@ clientExpress.use(passport.initialize());
 clientExpress.use(passport.session());
 
 // Redirect to authorization server login page
-clientExpress.get('/login', passport.authenticate('oauth2', {scope: ['scope1']}));
-clientExpress.get('/auth/callback',
+clientExpress.get('/authCode/login', passport.authenticate('oauth2', {scope: ['scope1']}));
+clientExpress.get('/authCode/callback',
     function (req, res, next) {
         //console.log('CALLBACK:', req.query);
         next();
@@ -31,31 +31,17 @@ clientExpress.get('/auth/callback',
     function (req, res) {
         // Successful authentication, redirect home.
         res.redirect('/success');
-    });
+    }
+);
 
-clientExpress.get('/failed', (req, res) => res.status(200).json({
-    message: 'failed-page'
-}));
-clientExpress.get('/success', (req, res) => res.status(200).json({
-    message: 'success-page',
-    user: req.user
-}));
+clientExpress.get('/failed', (req, res) => res.status(200).json({message: 'failed-page'}));
+clientExpress.get('/success', (req, res) => res.status(200).json({message: 'success-page', user: req.user}));
+clientExpress.get('/secret', isLoggedIn, (req, res) => res.status(200).json({message: 'secret-page', user: req.user}));
 
-clientExpress.get('/secret', isLoggedIn, (req, res) =>{
-    // console.log(req.user);
-    res.send('secret-page');
+let server = clientExpress.listen(DATA.CLIENT_PORT, () => {
+    console.log('Client passport server listening at', DATA.CLIENT_PORT);
 });
-
-let servers = [
-    clientExpress.listen(DATA.CLIENT_PORT, () => {
-        console.log('Client server listening at', DATA.CLIENT_PORT);
-    }),
-];
-setTimeout(() => servers.forEach(s => s.close()), 60 * 1000);
-
-
-// TODO - https://www.passportjs.org/packages/passport-oauth2-client-password/
-// TODO - https://www.passportjs.org/packages/passport-oauth2-resource-owner-password/
+setTimeout(() => server.close.bind(server), 60 * 1000);
 
 describe("Passport", function () {
     this.timeout(10 * 1000);
@@ -63,9 +49,8 @@ describe("Passport", function () {
     axiosCookieJarSupport.wrapper(axios);
     const cookieJar = new tough.CookieJar();
 
-    let tokens;
     it('Authorization code flow', () => {
-        return axios.get(DATA.CLIENT_URL + '/login', {
+        return axios.get(DATA.CLIENT_URL + '/authCode/login', {
             jar: cookieJar,
             withCredentials: true
         }).then(res => {
@@ -74,7 +59,6 @@ describe("Passport", function () {
             chai.expect(data.user.id).to.equal('user-id');
             chai.expect(data.user.profile.name).to.equal('name');
             chai.expect(data.user.profile.email).to.equal('email');
-            tokens = data.user.tokens;
         });
     });
 });

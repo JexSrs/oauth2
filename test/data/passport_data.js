@@ -43,7 +43,6 @@ authCodeStrategy.userProfile = function (accessToken, done) {
 
 
 
-
 passport.use(authCodeStrategy);
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));

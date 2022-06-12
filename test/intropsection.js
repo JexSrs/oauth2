@@ -28,7 +28,7 @@ clientExpress.get('/protected4', resServer.authenticate(['scope1', 'scope2'], 's
 });
 
 const server = clientExpress.listen(DATA.CLIENT_INTROSPECTION_PORT, () => {
-    console.log('Client implicit server listening at', DATA.CLIENT_INTROSPECTION_PORT);
+    console.log('Resource server listening at', DATA.CLIENT_INTROSPECTION_PORT);
 });
 
 setTimeout(server.close.bind(server), 60 * 1000);
