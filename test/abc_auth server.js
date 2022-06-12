@@ -9,7 +9,7 @@ let deviceDB = {};
 let devicePendingRequestCounter = 0;
 
 let authSrv = new AuthorizationServer({
-    errorUri: DATA.AUTHORIZATION_ERROR_URI,
+    errorUri: DATA.ERROR_URI,
     accessTokenLifetime: 60, // 1 minute
     refreshTokenLifetime: 120, // 2 minutes
     secret: 'SUPER-DUPER-SECRET',
@@ -153,16 +153,19 @@ authorizationExpress.post('/oauth/v2/device', function (req, res, next) {
     next();
 }, authSrv.device());
 
-// No scope validation
 authorizationExpress.get('/protected', authSrv.authenticate(), function (req, res) {
     res.status(200).end('protected-content');
 });
-// With valid scope
 authorizationExpress.get('/protected1', authSrv.authenticate('scope1'), function (req, res) {
     res.status(200).end('protected-content');
 });
-// With invalid scope
 authorizationExpress.get('/protected2', authSrv.authenticate('scope2'), function (req, res) {
+    res.status(200).end('protected-content');
+});
+authorizationExpress.get('/protected3', authSrv.authenticate(['scope1', 'scope2'], 'all'), function (req, res) {
+    res.status(200).end('protected-content');
+});
+authorizationExpress.get('/protected4', authSrv.authenticate(['scope1', 'scope2'], 'some'), function (req, res) {
     res.status(200).end('protected-content');
 });
 
