@@ -1,5 +1,6 @@
 import {ExpressMiddleware} from "./components/types";
-import {buildQuery, error, validateUserAgent} from "./modules/utils";
+import {buildQuery, error} from "./modules/utils";
+import {validateUserAgent} from "./modules/useragent";
 import {verifyToken} from './modules/tokenUtils'
 import {Implementation} from "./components/implementation";
 import {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
