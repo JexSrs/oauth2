@@ -54,9 +54,10 @@ export class ResourceServer {
 
                 // Check scopes
                 if(scopes) {
+                    let dataScopes = data.scope.split(this.options.scopeDelimiter);
                     if(
-                        (condition === 'all' && data.scope.split(this.options.scopeDelimiter).some((v: string) => !scopes!.includes(v)))
-                        || (condition === 'some' && data.scope.split(this.options.scopeDelimiter).some((v: string) => scopes!.includes(v)))
+                        (condition === 'all' && scopes.some((v: string) => !dataScopes!.includes(v)))
+                        || (condition === 'some' && dataScopes.some((v: string) => !scopes!.includes(v)))
                     )
                         return error(res, {
                             error: 'insufficient_scope',

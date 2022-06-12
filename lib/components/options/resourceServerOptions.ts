@@ -20,7 +20,7 @@ export type ResourceServerOptions = {
      */
     setPayloadLocation?: (req: any, payload: object) => void;
     /**
-     * Extra headers that ou may want to send to the authorization server when authenticating a request.
+     * Extra headers that you may want to send to the authorization server when authenticating a request.
      * For example, if the introspection endpoint is public, and you want to protect it with client credentials
      * then adding the credentials to the header may do the job done!
      */

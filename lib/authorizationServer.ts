@@ -425,22 +425,6 @@ export class AuthorizationServer {
                 });
             }
 
-            if (scopes) {
-                if(
-                    (condition === 'all' && payload.scopes.some((v: string) => !scopes!.includes(v)))
-                    || (condition === 'some' && payload.scopes.some((v: string) => scopes!.includes(v)))
-                ) {
-                    this.eventEmitter.emit(Events.AUTHENTICATION_SCOPES_INVALID, req);
-                    return error(res, {
-                        error: 'insufficient_scope',
-                        error_description: 'Client does not have access to this endpoint',
-                        error_uri: this.options.errorUri,
-                        status: 403,
-                        noCache: false
-                    });
-                }
-            }
-
             let dbToken = await this.options.getAccessToken({
                 accessToken: token,
                 clientId: payload.client_id,
@@ -456,6 +440,22 @@ export class AuthorizationServer {
                     status: 401,
                     noCache: false
                 });
+            }
+
+            if (scopes) {
+                if(
+                    (condition === 'all' && scopes.some((v: string) => !payload.scopes!.includes(v)))
+                    || (condition === 'some' && payload.scopes.some((v: string) => !scopes!.includes(v)))
+                ) {
+                    this.eventEmitter.emit(Events.AUTHENTICATION_SCOPES_INVALID, req);
+                    return error(res, {
+                        error: 'insufficient_scope',
+                        error_description: 'Client does not have access to this endpoint',
+                        error_uri: this.options.errorUri,
+                        status: 403,
+                        noCache: false
+                    });
+                }
             }
 
             this.options.setPayloadLocation(req, {
