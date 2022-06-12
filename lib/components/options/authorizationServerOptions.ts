@@ -81,7 +81,7 @@ export type AuthorizationServerOptions = {
      *
      * It defaults to 'true':
      * ```
-     * function isGrantTypeAllowed(client_id, impName) {
+     * function isImplementationAllowed(client_id, impName) {
      *     return true;
      * }
      * ```
