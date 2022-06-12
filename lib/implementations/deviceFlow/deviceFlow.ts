@@ -19,12 +19,6 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
         || Math.trunc(opts.expiresIn) !== opts.expiresIn)
         throw new Error('expiresIn is not positive integer.');
 
-    if(opts.removeOnExpired === undefined)
-        opts.removeOnExpired = true;
-
-    if(opts.removeOnDenied === undefined)
-        opts.removeOnDenied = true;
-
     if(opts.deviceCodeGenerator === undefined)
         opts.deviceCodeGenerator = (client_id) => randStr(64);
     else if(typeof  opts.deviceCodeGenerator !== 'function')
@@ -141,12 +135,6 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 }
 
                 if(dbDev.expiresAt <= Math.trunc(Date.now() / 1000)) {
-                    if(opts.removeOnExpired)
-                        await opts.removeDevice({
-                            clientId: client_id,
-                            deviceCode: device_code
-                        });
-
                     eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_EXPIRED, data.req);
                     return callback(undefined, {error: 'expired_token', status: 400});
                 }
@@ -159,11 +147,6 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 // Request completed - Get user if authorized
                 let user = await opts.getUser(dbDev.deviceCode, dbDev.userCode);
                 if (!user) {
-                    if(opts.removeOnDenied)
-                        await opts.removeDevice({
-                            clientId: client_id,
-                            deviceCode: device_code
-                        });
                     eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_ACCESS_DENIED, data.req);
                     return callback(undefined, {error: 'access_denied', status: 400});
                 }

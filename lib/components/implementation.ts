@@ -5,25 +5,29 @@ import EventEmitter from "events";
 
 export interface Implementation {
     /**
-     * The name of the implementation. This will be used for error handling,
-     * and it is not necessary to be unique.
+     * The name of the implementation. This will be provided to the isImplementationAllowed function.
+     * It is not required to be unique.`
+     *
+     * For example the authorization code flow has two implementations, one that generates the authorization code
+     * at the 'authorize' endpoint, and one at the 'token' endpoint.
      */
     name: string;
     /**
-     * The endpoint where the implementation will be accessed.
-     * * authorize: The user will need to authorize the request before reaching the implementation.
+     * The endpoint where the implementation will be accessed from:
+     * * authorize: The user will need to authorize the request.
      * * token: There is no user interaction, or the user has provided their credentials to the client.
-     * * device: There is no user interaction, this endpoint will be used for the device flow.
+     * * device: There is no user interaction, this endpoint is used for the device flow.
      *
-     * The authorization endpoint will make the following checks:
+     * Check that will be made before reaching the implementations:
+     * * isImplementationAllowed
+     *
+     * For the authorization endpoint only:
      * * validateRedirectURI
      * * isTemporaryUnavailable
-     * * rejectEmbeddedWebViews
-     * * isGrantTypeAllowed
-     * * isScopesValid
+     * * validateRequest
      *
-     * The device endpoint will make the following checks:
-     * * isScopesValid
+     * The device endpoint only:
+     * * validateScopes
      */
     endpoint: 'authorize' | 'token' | 'device';
     /**
@@ -32,14 +36,15 @@ export interface Implementation {
      */
     matchType: string;
     /**
-     * The function that will be called when the matchType is sent by the client.
+     * This function will be called after all the checks were made.
      * @param data Objects needed for the implementation.
      * @param callback The callback that will provide the answer to the client. In endpoint authorize, state
      *                  will automatically be added, so there is no need to include it in your response.
+     * @param eventEmitter The Node.js event emitter that will emit events.
      */
     function: (
         data: {
-            /** The request instance, to get any existing or extra information that may be needed. */
+            /** The request instance, to get any extra information that may be needed. */
             req: any;
             /** The authorization server's options that was passed while creating the server. */
             serverOpts: Required<AuthorizationServerOptions>,

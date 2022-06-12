@@ -1,5 +1,9 @@
 import isbot from "isbot";
 
+/**
+ * Will check was made from a bot.
+ * @param useragent
+ */
 function isBot(useragent: string): boolean {
     return isbot(useragent);
 }
@@ -16,10 +20,18 @@ const webviewRegExp = new RegExp('(' + [
     'Linux; U; Android'
 ].join('|') + ')', 'ig')
 
+/**
+ * Will check if the request was made from an embedded web view.
+ * @param useragent
+ */
 function isEmbeddedWebView(useragent: string): boolean {
     return !!useragent.match(webviewRegExp)
 }
 
+/**
+ * Will make the appropriate user agent checks.
+ * @param useragent
+ */
 export function validateUserAgent(useragent: string): boolean {
     if(isBot(useragent)) return false;
     if(isEmbeddedWebView(useragent)) return false;

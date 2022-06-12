@@ -54,11 +54,11 @@ export class AuthorizationServer {
         if (typeof opts.isTemporaryUnavailable === 'undefined')
             opts.isTemporaryUnavailable = false;
 
-        if (typeof opts.validateUserAgent === 'undefined')
-            opts.validateUserAgent = validateUserAgent;
+        if (typeof opts.validateRequest === 'undefined')
+            opts.validateRequest = (req) => validateUserAgent(req.headers['user-agent']);
 
-        if (typeof opts.isGrantTypeAllowed === 'undefined')
-            opts.isGrantTypeAllowed = (client_id) => true;
+        if (typeof opts.isImplementationAllowed === 'undefined')
+            opts.isImplementationAllowed = (client_id, impName) => true;
 
         if (typeof opts.scopeDelimiter === 'undefined')
             opts.scopeDelimiter = ' ';
@@ -90,7 +90,7 @@ export class AuthorizationServer {
 
     /**
      * Register a new implementation.
-     * @param implementation
+     * @param implementation You can provide more than one implementation in the same time.
      */
     public use(implementation: Implementation | Implementation[]): AuthorizationServer {
         let imps = Array.isArray(implementation) ? implementation : [implementation];
@@ -140,6 +140,9 @@ export class AuthorizationServer {
     /**
      * Assign this function to the 'authorize' endpoint with GET method.
      * Recommended endpoint: GET /api/oauth/v2/authorize
+     *
+     * The authorization endpoint is not the responsible for the user authentication,
+     * so do not forget to do that before reaching this function.
      */
     public authorize(): ExpressMiddleware {
         return async (req, res, next) => {
@@ -191,7 +194,7 @@ export class AuthorizationServer {
                 });
 
             // Reject embedded web views
-            if(!(await this.options.validateUserAgent(req.headers['user-agent']))) {
+            if(!(await this.options.validateRequest(req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_USERGAENT_INVALID, req);
                 return error(res, {
                     error: 'invalid_request',
@@ -225,11 +228,11 @@ export class AuthorizationServer {
                 });
             }
 
-            if (!(await this.options.isGrantTypeAllowed!(client_id, imp.name))) {
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
-                    error_description: 'This client does not have access to use this authorization flow',
+                    error_description: 'This client does not have access to use this flow',
                     error_uri: this.options.errorUri,
                     redirect_uri,
                     state
@@ -238,7 +241,7 @@ export class AuthorizationServer {
 
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.isScopesValid(scopes))) {
+            if (!(await this.options.validateScopes(scopes))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
@@ -275,6 +278,8 @@ export class AuthorizationServer {
     /**
      * Assign this function to the 'token' endpoint with POST method.
      * Recommended endpoint: POST /api/oauth/v2/token
+     *
+     * The token endpoint will be accessed directly from the client.
      */
     public token(): ExpressMiddleware {
         return async (req, res, next) => {
@@ -284,6 +289,7 @@ export class AuthorizationServer {
             }
 
             const {grant_type} = req.body;
+            let {client_id} = (this.options.getClientCredentials as any)(req);
 
             if (!grant_type)
                 return error(res, {
@@ -297,6 +303,15 @@ export class AuthorizationServer {
                 return error(res, {
                     error: 'unsupported_grant_type',
                     error_description: `Grant type ${grant_type} is not supported`,
+                    error_uri: this.options.errorUri
+                });
+            }
+
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
+                return error(res, {
+                    error: 'unauthorized_client',
+                    error_description: 'This client does not have access to use this flow',
                     error_uri: this.options.errorUri
                 });
             }
@@ -322,6 +337,8 @@ export class AuthorizationServer {
     /**
      * Assign this function to the 'device' endpoint with POST method.
      * Recommended endpoint: POST /api/oauth/v2/device
+     * .
+     * The device endpoint is used for the device flow/
      */
     public device(): ExpressMiddleware {
         return async (req, res, next) => {
@@ -331,6 +348,7 @@ export class AuthorizationServer {
             }
 
             const {grant_type, scope} = req.body;
+            let {client_id} = (this.options.getClientCredentials as any)(req);
 
             if (!grant_type)
                 return error(res, {
@@ -348,9 +366,18 @@ export class AuthorizationServer {
                 });
             }
 
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
+                return error(res, {
+                    error: 'unauthorized_client',
+                    error_description: 'This client does not have access to use this flow',
+                    error_uri: this.options.errorUri,
+                });
+            }
+
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.isScopesValid(scopes))) {
+            if (!(await this.options.validateScopes(scopes))) {
                 this.eventEmitter.emit(Events.DEVICE_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
@@ -379,8 +406,9 @@ export class AuthorizationServer {
     }
 
     /**
-     * This function will be used to authenticate a request if the resource and authorization server
-     * are one and the same. If they are different checkout the introspection endpoint.
+     * This function will be used to authenticate a request if the authorization and resource server
+     * are the same. If they are different checkout the introspection endpoint.
+     *
      * @param scope The scopes needed for this request. If the access token scopes are insufficient
      *              then the authentication will fail. If scope is not initialized then the scope
      *              check will be omitted.
@@ -470,9 +498,12 @@ export class AuthorizationServer {
 
     /**
      * Assign this function to the 'introspection' endpoint with POST method.
+     * Recommended endpoint: POST /api/oauth/v2/introspection
+     *
+     * The introspection endpoint will be reached from the resource servers to verify the validity of a token.
+     *
      * This endpoint is meant to be accessible only by the resource servers, if you make this endpoint
      * public make sure to verify the client on your own before the request reach this function.
-     * Recommended endpoint: POST /api/oauth/v2/introspection
      */
     public introspection(): ExpressMiddleware {
         const inactive = (res: any): void => {
@@ -490,6 +521,9 @@ export class AuthorizationServer {
 
             let payload: any = verifyToken(token, this.options.secret);
             if (!payload) return inactive(res);
+
+            if(payload.type !== 'access_token')
+                return inactive(res);
 
             let dbToken = await this.options.getAccessToken({
                 accessToken: token,

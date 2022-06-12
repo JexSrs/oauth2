@@ -1,8 +1,9 @@
 const {signToken, verifyToken} = require('../dist');
+const {randStr} = require('../dist/modules/utils');
 const chai = require("chai");
 
 const PAYLOAD = {id: 5};
-const SECRET = 'cat-secret';
+const SECRET = randStr(Math.floor(Math.random() * (128 - 32) + 32));
 const EXPIRES_IN = 5;
 
 describe("Tokens", function () {

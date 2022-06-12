@@ -1,16 +1,18 @@
 import {Implementation} from "../../components/implementation";
 import {generateARTokens, verifyToken, getTokenExpiresAt} from "../../modules/tokenUtils";
 import {RefreshTokenOptions} from "./refreshTokenOptions";
-import {defaultCommonOpts} from "../../modules/utils";
 import {Events} from "../../components/events";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
-    let opts = {...options, ...defaultCommonOpts(options)};
+    let opts = {...options};
 
     if(typeof opts.getRefreshToken !== 'function')
         throw new Error('getRefreshToken is not a function');
     if(typeof opts.deleteTokens !== 'function')
         throw new Error('deleteTokens is not a function');
+
+    if(typeof opts.validateClient !== 'function')
+        throw new Error('validateClient is not a function');
 
     return {
         name: 'refresh-token',
@@ -103,7 +105,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             // Generate new tokens
             let tokens = generateARTokens({
                 user: refreshTokenPayload.user
-            }, client_id, scopes, data.serverOpts, true);
+            }, client_id, scopes, data.serverOpts, data.issueRefreshToken);
 
             // Database save
             let dbRes = await data.serverOpts.saveTokens({
