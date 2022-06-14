@@ -6,7 +6,7 @@ import {Events} from "../../components/events";
 export function clientCredentials(options: ClientCredentialsOptions): Implementation {
     let opts = {...options};
 
-    if(typeof opts.validateClient !== 'function')
+    if (typeof opts.validateClient !== 'function')
         throw new Error('validateClient is not a function');
 
     return {
@@ -45,9 +45,9 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
                 accessTokenExpiresAt: getTokenExpiresAt(tokens, data.serverOpts.accessTokenLifetime!, 'access'),
                 clientId: client_id,
                 scopes,
-            });
+            }, data.req);
 
-            if(!dbRes) {
+            if (!dbRes) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',

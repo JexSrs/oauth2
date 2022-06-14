@@ -92,7 +92,7 @@ describe("Common implementations", function () {
             + `&client_secret=${DATA.CLIENT_SECRET}`
             + `&refresh_token=${tokens.refresh_token}`, {
                 validateStatus: (s) => true
-        }).then(res => {
+            }).then(res => {
             chai.expect(res.status).to.equal(200);
             chai.expect(res.data.token_type).to.equal('Bearer');
             chai.expect(res.data.scope).to.equal('scope1');

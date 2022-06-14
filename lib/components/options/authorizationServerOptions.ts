@@ -215,9 +215,10 @@ export type AuthorizationServerOptions = {
      * If this function returns false, then the generated tokens will not be sent
      * to the client and will respond with an error 'server_error' message.
      * @param data
+     * @param req The request instance, it may be used to pass other data.
      * @return {boolean} True on succeed, false otherwise.
      */
-    saveTokens: (data: THTokenSave) => Promise<boolean>;
+    saveTokens: (data: THTokenSave, req: any) => Promise<boolean>;
     /**
      * When authenticating a request, the library will first do the JWT verification
      * and then ask the database to provide the same token.

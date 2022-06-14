@@ -6,10 +6,10 @@ import {Events} from "../../components/events";
 export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOptions): Implementation {
     let opts = {...options};
 
-    if(typeof opts.validateUser !== 'function')
+    if (typeof opts.validateUser !== 'function')
         throw new Error('validateUser is not a function');
 
-    if(typeof opts.validateClient !== 'function')
+    if (typeof opts.validateClient !== 'function')
         throw new Error('validateClient is not a function');
 
     return {
@@ -20,13 +20,13 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             let {client_id, client_secret} = (data.serverOpts.getClientCredentials as any)(data.req);
             const {scope, username, password} = data.req.body;
 
-            if(!username)
+            if (!username)
                 return callback(undefined, {
                     error: 'invalid_request',
                     error_description: 'Body parameter username is missing'
                 });
 
-            if(!password)
+            if (!password)
                 return callback(undefined, {
                     error: 'invalid_request',
                     error_description: 'Body parameter password is missing'
@@ -71,9 +71,9 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
                 clientId: client_id,
                 user,
                 scopes,
-            });
+            }, data.req);
 
-            if(!dbRes) {
+            if (!dbRes) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',

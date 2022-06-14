@@ -16,7 +16,7 @@ const isLoggedIn = (req, res, next) => {
 
 const clientExpress = express();
 clientExpress.use(express.json({type: "**/**"}));
-clientExpress.use(require('express-session')({ secret: 'keyboard cat', resave: true, saveUninitialized: true }));
+clientExpress.use(require('express-session')({secret: 'keyboard cat', resave: true, saveUninitialized: true}));
 clientExpress.use(passport.initialize());
 clientExpress.use(passport.session());
 
