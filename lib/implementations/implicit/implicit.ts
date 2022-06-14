@@ -20,9 +20,9 @@ export function implicit(): Implementation {
                 clientId: client_id,
                 user: data.user!,
                 scopes: data.scopes!,
-            });
+            }, data.req);
 
-            if(!dbRes) {
+            if (!dbRes) {
                 eventEmitter.emit(Events.AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',

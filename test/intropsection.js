@@ -122,8 +122,7 @@ describe("Introspection", function () {
             'grant_type=refresh_token'
             + `&client_id=${DATA.CLIENT_ID}`
             + `&client_secret=${DATA.CLIENT_SECRET}`
-            + `&refresh_token=${tokens.refresh_token}`, {
-            }).then(res => {
+            + `&refresh_token=${tokens.refresh_token}`, {}).then(res => {
             chai.expect(res.status).to.equal(200);
             chai.expect(res.data.token_type).to.equal('Bearer');
             chai.expect(res.data.scope).to.equal('scope1');

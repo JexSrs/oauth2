@@ -1,6 +1,15 @@
 const express = require('express');
 const DATA = require("./data/data");
-const {AuthorizationServer, implicit, clientCredentials, resourceOwnerCredentials, refreshToken, authorizationCode, deviceFlow, Events} = require("../dist");
+const {
+    AuthorizationServer,
+    implicit,
+    clientCredentials,
+    resourceOwnerCredentials,
+    refreshToken,
+    authorizationCode,
+    deviceFlow,
+    Events
+} = require("../dist");
 
 let authSrvDB = {};
 let authCodeDB = {};
@@ -17,11 +26,11 @@ let authSrv = new AuthorizationServer({
     getUser: req => req.loggedInUser,
     getAccessToken: data => {
         // console.log('GET ACCESS', authSrvDB.accessToken === data.accessToken)
-        if(authSrvDB.accessToken === data.accessToken)
+        if (authSrvDB.accessToken === data.accessToken)
             return authSrvDB.accessToken;
         return null;
     },
-    saveTokens: data => {
+    saveTokens: (data, req) => {
         // console.log('Saving tokens', data)
         authSrvDB = data;
         return true;
@@ -41,12 +50,12 @@ authSrv.use(authorizationCode({
     allowCodeChallengeMethodPlain: false,
     authorizationCodeLifetime: 10, // 10 seconds
     deleteAuthorizationCode: data => {
-        if(data.authorizationCode === authCodeDB.authorizationCode)
+        if (data.authorizationCode === authCodeDB.authorizationCode)
             authCodeDB = {};
         return true;
     },
     getAuthorizationCode: data => {
-        if(authCodeDB.authorizationCode === data.authorizationCode)
+        if (authCodeDB.authorizationCode === data.authorizationCode)
             return authCodeDB;
         return null;
     },
@@ -73,12 +82,12 @@ authSrv.use(refreshToken({
         client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
     deleteTokens: data => {
         // console.log('DELETING', authSrvDB.refreshToken === data.refreshToken)
-        if(authSrvDB.refreshToken === data.refreshToken)
+        if (authSrvDB.refreshToken === data.refreshToken)
             authSrvDB = {};
         return true;
     },
     getRefreshToken: data => {
-        if(authSrvDB.refreshToken === data.refreshToken)
+        if (authSrvDB.refreshToken === data.refreshToken)
             return authSrvDB.refreshToken;
         return null;
     }
@@ -96,7 +105,7 @@ authSrv.use(deviceFlow({
         return true;
     },
     getBucket: deviceCode => {
-        if(deviceCode === bucketDB.deviceCode)
+        if (deviceCode === bucketDB.deviceCode)
             return bucketDB.bucket;
         return null;
     },
@@ -105,12 +114,12 @@ authSrv.use(deviceFlow({
         return true;
     },
     getDevice: data => {
-        if(data.deviceCode === deviceDB.deviceCode)
+        if (data.deviceCode === deviceDB.deviceCode)
             return deviceDB;
         return null;
     },
     removeDevice: data => {
-        if(data.deviceCode === deviceDB.deviceCode)
+        if (data.deviceCode === deviceDB.deviceCode)
             deviceDB = {};
         return true;
     }
@@ -125,7 +134,7 @@ authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
 });
 authSrv.on(Events.TOKEN_FLOWS_DEVICE_CODE_PENDING, req => {
     devicePendingRequestCounter++;
-    if(devicePendingRequestCounter === 2)
+    if (devicePendingRequestCounter === 2)
         deviceDB.status = 'completed';
 });
 

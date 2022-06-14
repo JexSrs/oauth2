@@ -1,17 +1,17 @@
 import {Implementation} from "../../components/implementation";
-import {generateARTokens, verifyToken, getTokenExpiresAt} from "../../modules/tokenUtils";
+import {generateARTokens, getTokenExpiresAt, verifyToken} from "../../modules/tokenUtils";
 import {RefreshTokenOptions} from "./refreshTokenOptions";
 import {Events} from "../../components/events";
 
 export function refreshToken(options: RefreshTokenOptions): Implementation {
     let opts = {...options};
 
-    if(typeof opts.getRefreshToken !== 'function')
+    if (typeof opts.getRefreshToken !== 'function')
         throw new Error('getRefreshToken is not a function');
-    if(typeof opts.deleteTokens !== 'function')
+    if (typeof opts.deleteTokens !== 'function')
         throw new Error('deleteTokens is not a function');
 
-    if(typeof opts.validateClient !== 'function')
+    if (typeof opts.validateClient !== 'function')
         throw new Error('validateClient is not a function');
 
     return {
@@ -23,7 +23,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             let {scope, refresh_token} = data.req.body;
             // if (!client_id) client_id = req.body.client_id;
 
-            if(!refresh_token)
+            if (!refresh_token)
                 return callback(undefined, {
                     error: 'invalid_request',
                     error_description: 'Body parameter refresh_token is missing'
@@ -39,7 +39,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 });
             }
 
-            if(refreshTokenPayload.type !== 'refresh_token') {
+            if (refreshTokenPayload.type !== 'refresh_token') {
                 eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN, data.req);
                 return callback(undefined, {
                     error: 'invalid_grant',
@@ -49,7 +49,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
 
             // Scope is optional
             let scopes: string[] = refreshTokenPayload.scopes;
-            if(scope) {
+            if (scope) {
                 // Check scopes - No need to check with app because the new scopes must
                 // be subset of the refreshTokenPayload.scopes
                 scopes = scope.split(data.serverOpts.scopeDelimiter);
@@ -116,9 +116,9 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 clientId: client_id,
                 user: refreshTokenPayload.user,
                 scopes,
-            });
+            }, data.req);
 
-            if(!dbRes) {
+            if (!dbRes) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR, data.req);
                 return callback(undefined, {
                     error: 'server_error',
