@@ -205,6 +205,19 @@ export class AuthorizationServer {
                 });
             }
 
+            // Validate scopes
+            let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
+            if (!(await this.options.validateScopes(scopes))) {
+                this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
+                return error(res, {
+                    error: 'invalid_scope',
+                    error_description: 'One or more scopes are not acceptable',
+                    error_uri: this.options.errorUri,
+                    redirect_uri,
+                    state
+                });
+            }
+
             // Get user identification
             let user: any;
             if ((user = this.options.getUser(req)) == null)
@@ -233,19 +246,6 @@ export class AuthorizationServer {
                 return error(res, {
                     error: 'unauthorized_client',
                     error_description: 'This client does not have access to use this flow',
-                    error_uri: this.options.errorUri,
-                    redirect_uri,
-                    state
-                });
-            }
-
-            // Validate scopes
-            let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.validateScopes(scopes))) {
-                this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
-                return error(res, {
-                    error: 'invalid_scope',
-                    error_description: 'One or more scopes are not acceptable',
                     error_uri: this.options.errorUri,
                     redirect_uri,
                     state
