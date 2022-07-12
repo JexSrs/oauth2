@@ -39,15 +39,16 @@ export type AuthorizationCodeOptions = {
      * and expire it after authorizationCodeLifetime seconds (or data.expiresAt - Math.floor(Date.now() / 1000) seconds).
      *
      * @param data The data that needs to be saved.
+     * @param req The request instance.
      * @return {boolean} True on success, false otherwise.
      */
-    saveAuthorizationCode: (data: THAuthorizationCodeSave) => Promise<boolean> | boolean;
+    saveAuthorizationCode: (data: THAuthorizationCodeSave, req: any) => Promise<boolean> | boolean;
     /**
      * This function will ask all the data that was saved during the first phase of the authorization code flow.
      * @param data
      * @return {string|null} The authorization code if it exists or null otherwise.
      */
-    getAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<THAuthorizationCodeSave | null> | THAuthorizationCodeSave | null;
+    getAuthorizationCode: (data: THAuthorizationCodeAsk, req: any) => Promise<THAuthorizationCodeSave | null> | THAuthorizationCodeSave | null;
     /**
      * This function will be called after verifying the authorization code at the second phase.
      *
@@ -56,14 +57,16 @@ export type AuthorizationCodeOptions = {
      * and revoke all the generated tokens.
      *
      * @param data
+     * @param req The request instance.
      * @return {boolean} True on success, false otherwise.
      */
-    deleteAuthorizationCode: (data: THAuthorizationCodeAsk) => Promise<boolean> | boolean;
+    deleteAuthorizationCode: (data: THAuthorizationCodeAsk, req: any) => Promise<boolean> | boolean;
     /**
      * Validates that the client in question is registered.
      * @param client_id The client's id.
      * @param client_secret The client's secret. It will be omitted if the user is e.x. a public client.
+     * @param req The request instance.
      * @return {boolean} True if validation succeeds, false otherwise.
      */
-    validateClient: (client_id?: string | null, client_secret?: string | null) => Promise<boolean> | boolean;
+    validateClient: (client_id: string | null | undefined, client_secret: string | null | undefined, req: any) => Promise<boolean> | boolean;
 };

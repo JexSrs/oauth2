@@ -46,7 +46,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                         error_description: 'Body parameter client_id is missing'
                     });
 
-                if (!(await opts.validateClient(client_id))) {
+                if (!(await opts.validateClient(client_id, data.req))) {
                     eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_CLIENT_INVALID, data.req);
                     return callback(undefined, {
                         error: 'unauthorized_client',
@@ -65,7 +65,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                     expiresAt: Math.trunc((Date.now() + opts.expiresIn! * 1000) / 1000),
                     scopes: data.scopes!,
                     status: 'pending'
-                });
+                }, data.req);
 
                 if (!dbRes) {
                     eventEmitter.emit(Events.DEVICE_FLOWS_TOKEN_SAVE_ERROR, data.req);
@@ -106,7 +106,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 // Rate limit using deviceCode
                 // We are using jwt tokens to make sure that the bucket is expired,
                 // in case the app sends the code even if it has expired.
-                const oldBucket = await opts.getBucket(device_code);
+                const oldBucket = await opts.getBucket(device_code, data.req);
                 if (oldBucket != null) {
                     const payload = verifyToken(oldBucket, data.serverOpts.secret);
                     if (payload != null) {
@@ -117,13 +117,13 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
 
                 // The signed JWT is internal and will never go to any user or client
                 const bucket = signToken({deviceCode: device_code}, data.serverOpts.secret, opts.interval);
-                await opts.saveBucket(device_code, bucket, opts.interval!);
+                await opts.saveBucket(device_code, bucket, opts.interval!, data.req);
 
                 // Get saved device
                 let dbDev = await opts.getDevice({
                     deviceCode: device_code,
                     clientId: client_id
-                });
+                }, data.req);
 
                 if (!dbDev || (dbDev.status !== 'pending' && dbDev.status !== 'completed')) {
                     eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_DEVICE_CODE_INVALID, data.req);
@@ -145,7 +145,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 }
 
                 // Request completed - Get user if authorized
-                let user = await opts.getUser(dbDev.deviceCode, dbDev.userCode);
+                let user = await opts.getUser(dbDev.deviceCode, dbDev.userCode, data.req);
                 if (!user) {
                     eventEmitter.emit(Events.TOKEN_FLOWS_DEVICE_CODE_ACCESS_DENIED, data.req);
                     return callback(undefined, {error: 'access_denied', status: 400});
@@ -154,7 +154,7 @@ export function deviceFlow(options: DeviceFlowOptions): Implementation[] {
                 await opts.removeDevice({
                     clientId: client_id,
                     deviceCode: device_code
-                });
+                }, data.req);
 
                 // Generate access & refresh tokens
                 let tokens = generateARTokens({user}, client_id, dbDev.scopes, data.serverOpts, data.issueRefreshToken);

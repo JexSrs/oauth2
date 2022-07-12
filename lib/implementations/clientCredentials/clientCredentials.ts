@@ -19,7 +19,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
 
             // Validate scopes
             let scopes = scope?.split(' ') || [];
-            if (!(await data.serverOpts.validateScopes(scopes))) {
+            if (!(await data.serverOpts.validateScopes(scopes, data.req))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',
@@ -28,7 +28,7 @@ export function clientCredentials(options: ClientCredentialsOptions): Implementa
             }
 
             // Validate client
-            if (!(await opts.validateClient(client_id, client_secret))) {
+            if (!(await opts.validateClient(client_id, client_secret, data.req))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',

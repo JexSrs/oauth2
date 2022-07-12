@@ -33,7 +33,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
                 });
 
             let scopes = scope?.split(data.serverOpts.scopeDelimiter) || [];
-            if (!(await data.serverOpts.validateScopes(scopes))) {
+            if (!(await data.serverOpts.validateScopes(scopes, data.req))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_SCOPES_INVALID, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',
@@ -42,7 +42,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
             }
 
             // Do database request at last to lessen db costs.
-            if (!(await opts.validateClient(client_id, client_secret))) {
+            if (!(await opts.validateClient(client_id, client_secret, data.req))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',
@@ -50,7 +50,7 @@ export function resourceOwnerCredentials(options: ResourceOwnerCredentialsOption
                 });
             }
 
-            let user = await opts.validateUser(username, password);
+            let user = await opts.validateUser(username, password, data.req);
             if (!user) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_PASSWORD_USER_INVALID, data.req);
                 return callback(undefined, {

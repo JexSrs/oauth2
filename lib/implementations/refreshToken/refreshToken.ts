@@ -72,7 +72,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
             }
 
             // Validate client
-            if (!(await opts.validateClient(client_id, client_secret))) {
+            if (!(await opts.validateClient(client_id, client_secret, data.req))) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID, data.req);
                 return callback(undefined, {
                     error: 'unauthorized_client',
@@ -85,7 +85,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 refreshToken: refresh_token,
                 clientId: client_id,
                 user: refreshTokenPayload.user,
-            });
+            }, data.req);
 
             if (!dbToken || dbToken !== refresh_token) {
                 eventEmitter.emit(Events.TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID, data.req);
@@ -100,7 +100,7 @@ export function refreshToken(options: RefreshTokenOptions): Implementation {
                 refreshToken: refresh_token,
                 clientId: client_id,
                 user: refreshTokenPayload.user
-            });
+            }, data.req);
 
             // Generate new tokens
             let tokens = generateARTokens({

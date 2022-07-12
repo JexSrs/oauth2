@@ -46,9 +46,10 @@ export type DeviceFlowOptions = {
      * be requested in short time frames.
      *
      * @param data
+     * @param req The request instance.
      * @return {boolean} True on success, false otherwise.
      */
-    saveDevice: (data: DFCodeSave) => Promise<boolean> | boolean;
+    saveDevice: (data: DFCodeSave, req: any) => Promise<boolean> | boolean;
     /**
      * When the client starts doing the polling requests, this function will be called
      * to retrieve the data saved before.
@@ -57,23 +58,26 @@ export type DeviceFlowOptions = {
      * and check if the user authorized the request.
      *
      * @param data
+     * @param req The request instance.
      * @return {DFCodeSave} The device's request or null if not found.
      */
-    getDevice: (data: DFCodeAsk) => Promise<DFCodeSave | null> | DFCodeSave | null;
+    getDevice: (data: DFCodeAsk, req: any) => Promise<DFCodeSave | null> | DFCodeSave | null;
     /**
      * When the request is marked as 'completed' this function will be called
      * to remove the saved data (if not already expired).
      *
      * @param data
+     * @param req The request instance.
      * @return {boolean} True on success, false otherwise.
      */
-    removeDevice: (data: DFCodeAsk) => Promise<boolean> | boolean;
+    removeDevice: (data: DFCodeAsk, req: any) => Promise<boolean> | boolean;
     /**
      * Validates that the client in question is registered.
      * @param client_id The client's id.
+     * @param req The request instance.
      * @return {boolean} True if validation succeeds, false otherwise.
      */
-    validateClient: (client_id: string) => Promise<boolean> | boolean;
+    validateClient: (client_id: string, req: any) => Promise<boolean> | boolean;
     /**
      * After the request is marked as 'completed', the user may have accepted or declined the request/
      *
@@ -83,9 +87,10 @@ export type DeviceFlowOptions = {
      *
      * @param deviceCode The device's code.
      * @param userCode The user's code.
+     * @param req The request instance.
      * @return {any} The user's identification.
      */
-    getUser: (deviceCode: string, userCode: string) => Promise<any> | any;
+    getUser: (deviceCode: string, userCode: string, req: any) => Promise<any> | any;
     /**
      * This function will be used to rate limit the polling requests made by the client.
      *
@@ -99,9 +104,10 @@ export type DeviceFlowOptions = {
      * @param deviceCode The device's code.
      * @param bucket The bucket.
      * @param expiresIn The time in seconds that expires.
+     * @param req The request instance.
      * @return {boolean} True if saved, false otherwise.
      */
-    saveBucket: (deviceCode: string, bucket: string, expiresIn: number) => Promise<boolean> | boolean;
+    saveBucket: (deviceCode: string, bucket: string, expiresIn: number, req: any) => Promise<boolean> | boolean;
     /**
      * This function will be used to rate limit the polling requests made by the client.
      *
@@ -112,7 +118,8 @@ export type DeviceFlowOptions = {
      * the flow will still verify the expiration time.
      *
      * @param bucket The bucket.
+     * @param req The request instance.
      * @return {string|null} The bucket or the null if it has expired.
      */
-    getBucket: (deviceCode: string) => Promise<string | null> | string | null;
+    getBucket: (deviceCode: string, req: any) => Promise<string | null> | string | null;
 };
