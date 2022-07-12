@@ -58,7 +58,7 @@ export class AuthorizationServer {
             opts.validateRequest = (req) => validateUserAgent(req.headers['user-agent']);
 
         if (typeof opts.isImplementationAllowed === 'undefined')
-            opts.isImplementationAllowed = (client_id, impName) => true;
+            opts.isImplementationAllowed = ( client_id, impName, req) => true;
 
         if (typeof opts.scopeDelimiter === 'undefined')
             opts.scopeDelimiter = ' ';
@@ -172,7 +172,7 @@ export class AuthorizationServer {
                 });
 
             // Validate client_id and redirect_uri
-            if (!(await this.options.validateRedirectURI(client_id, redirect_uri))) {
+            if (!(await this.options.validateRedirectURI(client_id, redirect_uri, req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_REDIRECT_URI_INVALID, req);
                 return error(res, {
                     error: 'invalid_request',
@@ -207,7 +207,7 @@ export class AuthorizationServer {
 
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.validateScopes(scopes))) {
+            if (!(await this.options.validateScopes(scopes, req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
@@ -241,7 +241,7 @@ export class AuthorizationServer {
                 });
             }
 
-            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name, req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
@@ -307,7 +307,7 @@ export class AuthorizationServer {
                 });
             }
 
-            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name, req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
@@ -366,7 +366,7 @@ export class AuthorizationServer {
                 });
             }
 
-            if (!(await this.options.isImplementationAllowed(client_id, imp.name))) {
+            if (!(await this.options.isImplementationAllowed(client_id, imp.name, req))) {
                 this.eventEmitter.emit(Events.AUTHORIZATION_RESPONSE_TYPE_REJECT, req);
                 return error(res, {
                     error: 'unauthorized_client',
@@ -377,7 +377,7 @@ export class AuthorizationServer {
 
             // Validate scopes
             let scopes: string[] = scope?.split(this.options.scopeDelimiter) || [];
-            if (!(await this.options.validateScopes(scopes))) {
+            if (!(await this.options.validateScopes(scopes, req))) {
                 this.eventEmitter.emit(Events.DEVICE_SCOPES_INVALID, req);
                 return error(res, {
                     error: 'invalid_scope',
@@ -458,7 +458,7 @@ export class AuthorizationServer {
                 accessToken: token,
                 clientId: payload.client_id,
                 user: payload.user
-            });
+            }, req);
 
             if (!dbToken || dbToken !== token) {
                 this.eventEmitter.emit(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req);
@@ -529,7 +529,7 @@ export class AuthorizationServer {
                 accessToken: token,
                 clientId: payload.client_id,
                 user: payload.user
-            });
+            }, req);
 
             if (!dbToken || dbToken !== token)
                 return inactive(res);

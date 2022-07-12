@@ -81,7 +81,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     redirectUri: redirect_uri,
                     codeChallenge: code_challenge,
                     codeChallengeMethod: code_challenge_method
-                });
+                }, data.req);
 
                 if (!dbRes) {
                     eventEmitter.emit(Events.AUTHORIZATION_FLOWS_CODE_SAVE_ERROR, data.req);
@@ -142,7 +142,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                 }
 
                 // Client validation
-                if (!(await opts.validateClient(client_id, client_secret))) {
+                if (!(await opts.validateClient(client_id, client_secret, data.req))) {
                     eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID, data.req);
                     return callback(undefined, {
                         error: 'unauthorized_client',
@@ -155,7 +155,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     clientId: client_id,
                     authorizationCode: code,
                     user: authCodePayload.user
-                });
+                }, data.req);
 
                 if (!dbCode || dbCode.authorizationCode !== code) {
                     eventEmitter.emit(Events.TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID, data.req);
@@ -190,7 +190,7 @@ export function authorizationCode(options: AuthorizationCodeOptions): Implementa
                     clientId: client_id,
                     authorizationCode: code,
                     user: dbCode.user
-                });
+                }, data.req);
 
                 // Generate access & refresh tokens
                 let tokens = generateARTokens({

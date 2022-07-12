@@ -85,11 +85,13 @@ export type AuthorizationServerOptions = {
      *     return true;
      * }
      * ```
+     *
      * @param client_id The client's id.
      * @param impName The name of the selected implementation.
+     * @param req The request instance.
      * @return {boolean} True if client is allowed, false otherwise.
      */
-    isImplementationAllowed?: (client_id: string, impName: string) => Promise<boolean> | boolean;
+    isImplementationAllowed?: (client_id: string, impName: string, req: any) => Promise<boolean> | boolean;
     /**
      * The delimiter that will be used to split the scope string.
      * Defaults to ' ' (one space character).
@@ -166,7 +168,7 @@ export type AuthorizationServerOptions = {
      * @param redirect_uri
      * @return {boolean} True if client id and redirect uri are valid, false otherwise.
      */
-    validateRedirectURI: (client_id?: string, redirect_uri?: string) => Promise<boolean>;
+    validateRedirectURI: (client_id: string | null | undefined, redirect_uri: string | null | undefined, req: any) => Promise<boolean>;
     /**
      * This function will check if the scopes sent from the client are valid.
      *
@@ -185,9 +187,10 @@ export type AuthorizationServerOptions = {
      * This option also supports asynchronous calls.
      *
      * @param scopes The scopes array.
+     * @param req The request instance.
      * @return {boolean} True if scopes are valid, false otherwise.
      */
-    validateScopes: (scopes: string[]) => Promise<boolean> | boolean;
+    validateScopes: (scopes: string[], req: any) => Promise<boolean> | boolean;
     /**
      * The authorization server uses JsonWebToken (JWT) to encode the generated tokens.
      * JWT uses a 'secret' to sign the tokens.
@@ -225,7 +228,8 @@ export type AuthorizationServerOptions = {
      *
      * If the access token has been revoked then return null.
      * @param data The access token alongside some other data that were used when saving the tokens.
+     * @param req The request instance.
      * @return {string|null} The access token if it exists, null otherwise.
      */
-    getAccessToken: (data: THAccessTokenAsk) => Promise<string | null | undefined> | string | null | undefined;
+    getAccessToken: (data: THAccessTokenAsk, req: any) => Promise<string | null | undefined> | string | null | undefined;
 };
