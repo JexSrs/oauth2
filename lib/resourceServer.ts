@@ -1,24 +1,36 @@
-import {ResourceServerOptions} from "./components/options/resourceServerOptions";
+import {ResourceServerOptions} from "./components/resourceServerOptions.js";
 import {ExpressMiddleware} from "./components/types";
 import axios from "axios";
-import {error} from "./modules/utils";
+import {buildQuery, error} from "./utils/utils";
+import {AuthorizationServerOptions} from "./components/authorizationServerOptions.js";
 
 export class ResourceServer {
 
     private readonly options: Required<ResourceServerOptions>;
 
-    constructor(opts: ResourceServerOptions) {
-        if (!opts.getToken)
+    constructor(options: ResourceServerOptions) {
+        let opts: ResourceServerOptions = Object.assign({}, options);
+
+        if (opts.getToken === undefined)
             opts.getToken = (req) => req.headers['authorization']?.split(' ')?.[1];
 
-        if (!opts.setPayloadLocation)
+        if (opts.setPayloadLocation === undefined)
             opts.setPayloadLocation = (req, payload) => req.payload = payload;
 
-        if(!opts.introspectionHeaders)
-            opts.introspectionHeaders = {};
+        if(opts.headers === undefined)
+            opts.headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            };
+        if(opts.body === undefined)
+            opts.body = {};
 
-        if(!opts.scopeDelimiter)
+        if(opts.scopeDelimiter === undefined)
             opts.scopeDelimiter = ' ';
+
+        ['introspectionURL', 'audience']
+            .forEach(field => {
+                if((opts as any)[field] === undefined) throw new Error(`Field ${field} cannot be undefined`);
+            });
 
         this.options = opts as Required<ResourceServerOptions>;
     }
@@ -36,17 +48,19 @@ export class ResourceServer {
      *              or at least one of them.
      */
     public authenticate(scope?: string | string[], cond?: 'all' | 'some'): ExpressMiddleware {
+        const options = Object.assign(this.options, {});
+
         let scopes: string[] | undefined = Array.isArray(scope) ? scope : (scope ? [scope] : undefined);
         let condition = cond || 'all';
 
         return (req, res, next) => {
-            let token = this.options.getToken(req);
+            let token = options.getToken(req);
 
-            axios.post(this.options.introspectionURL, {token}, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...this.options.introspectionHeaders, // Server may decide to change to url encoded or something
-                }
+            axios.post(options.introspectionURL, buildQuery({
+                ...options.body,
+                token,
+            }), {
+                headers: <any>options.headers
             }).then(response => {
                 const data = response.data;
 
@@ -54,14 +68,23 @@ export class ResourceServer {
                     return error(res, {
                         error: 'invalid_token',
                         error_description: 'The access token has expired',
-                        error_uri: this.options.errorUri,
+                        error_uri: options.errorUri,
+                        status: 401,
+                        noCache: false
+                    });
+
+                if(data.aud !== options.audience)
+                    return error(res, {
+                        error: 'invalid_token',
+                        error_description: 'The access token is not meant to be used in this resource server',
+                        error_uri: options.errorUri,
                         status: 401,
                         noCache: false
                     });
 
                 // Check scopes
                 if(scopes) {
-                    let dataScopes = data.scope.split(this.options.scopeDelimiter);
+                    let dataScopes = data.scope.split(options.scopeDelimiter);
                     if(
                         (condition === 'all' && scopes.some((v: string) => !dataScopes!.includes(v)))
                         || (condition === 'some' && dataScopes.some((v: string) => !scopes!.includes(v)))
@@ -69,13 +92,13 @@ export class ResourceServer {
                         return error(res, {
                             error: 'insufficient_scope',
                             error_description: 'Client does not have access to this endpoint',
-                            error_uri: this.options.errorUri,
+                            error_uri: options.errorUri,
                             status: 403,
                             noCache: false
                         });
                 }
 
-                this.options.setPayloadLocation(req, response.data)
+                options.setPayloadLocation(req, response.data)
                 next();
             }).catch(e => {
                 // Unexpected errors
@@ -83,7 +106,7 @@ export class ResourceServer {
                 error(res, {
                     error: 'server_error',
                     error_description: 'Authorization server is not responding or is not reachable.',
-                    error_uri: this.options.errorUri,
+                    error_uri: options.errorUri,
                     noCache: false,
                     status: 503
                 })

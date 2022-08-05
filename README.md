@@ -1,378 +1,179 @@
 # OAuth2
+
+## Table of contents
+* [Introduction & Specifications](#introduction--specifications)
+* [Installation](#installation)
+* [Authorization server](#authorization-server)
+  * [Flows](#flows)
+  * [Events](#events)
+  * [Functions & Endpoints](#functions--endpoints)
+  * [State](#state)
+* [Resource server](#resource-server)
+* [Security considerations](#security-considerations)
+
+## Introduction & Specifications
 **OAuth2 | Various Implementations for open authorization**
 
 This is a TypeScript implementation of OAuth2 as documented at [RFC6749](https://datatracker.ietf.org/doc/html/rfc6749).
-Many thanks to the [OAuth 2.0 Simplified](https://www.oauth.com/) website. It was a significant help while developing
-this library.
+Many thanks to the [OAuth 2.0 Simplified](https://www.oauth.com/) website. It was a significant help as
+a starting point while developing this library.
+
 You can see with more detail the specs that was used below:
 
-* OAuth 2.0 Core: [RFC6749](https://datatracker.ietf.org/doc/html/rfc6749)
-* Bearer tokens: [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750)
-* PKCE: [RFC7636](https://datatracker.ietf.org/doc/html/rfc7636)
-* Threat Model and Security Consideration: [RFC6819](https://datatracker.ietf.org/doc/html/rfc6819)
+* [RFC6749](https://datatracker.ietf.org/doc/html/rfc6749): OAuth 2.0 Core
+* [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750): Bearer Tokens
+* [RFC6819](https://datatracker.ietf.org/doc/html/rfc6819): Threat Model and Security Consideration
+* [RFC7009](https://datatracker.ietf.org/doc/html/rfc7009): Token Revocation
+* [RFC7636](https://datatracker.ietf.org/doc/html/rfc7636): PKCE Extension
+* [RFC7662](https://datatracker.ietf.org/doc/html/rfc7662): Token Introspection
+* [RFC8252](https://datatracker.ietf.org/doc/html/rfc8252): OAuth 2.0 for Native Apps
+* [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628): Device Authorization Grant
+* [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068): JWT Profile for OAuth Access Tokens
+* [RFC9101](https://datatracker.ietf.org/doc/html/rfc9101): JWT Authorization Request
 * [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics)
-* Token Introspection: [RFC7662](https://datatracker.ietf.org/doc/html/rfc7662)
-* JWT Profile for OAuth Access Tokens: [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068)
-* Device Authorization Grant: [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628)
-* JWT Authorization Request: [RFC9101](https://datatracker.ietf.org/doc/html/rfc9101)
 
-Some more SPECS will be implemented in the feature from [here](https://www.oauth.com/oauth2-servers/map-oauth-2-0-specs/).
+## Installation
+This library is not in [npm](https://www.npmjs.com/). To use it you have to clone the repository to
+your machine and use the `link` command:
 
-# Table of contents
-* [Installation](#installation)
-* [Authorization server](#authorization-server)
-  * [Options](#options)
-  * [Implementations](#implementations)
-    * [Authorization code](#authorization-code)
-      * [Options](#options-1)
-      * [Passport](#passport)
-    * [Client credentials](#client-credentials)
-      * [Options](#options-2)
-    * [Device flow](#device-flow)
-        * [Options](#options-3)
-    * [Implicit](#implicit)
-        * [Options](#options-4)
-    * [Refresh token](#refresh-token)
-        * [Options](#options-5)
-    * [Resource owner credentials](#resource-owner-credentials)
-      * [Options](#options-6)
-    * [Add custom](#add-custom)
-  * [Events](#events)
-  * [Endpoints](#endpoints)
-    * [Authorize](#authorize)
-    * [Token](#token)
-    * [Device](#device)
-    * [Introspection](#introspection)
-    * [Authenticate](#authenticate)
-* [Resource server](#resource-server)
-  * [Options](#options-7)
-* [Client](#client)
-    * [Options](#options-8)
-
-
-# Installation
 ```shell
-# Add repository as dependency 
+# Clone
+git clone https://github.com/JexSrs/oauth2.git
+# Go to your project
+cd my-project
+# and link
+npm link ../oauth2
 ```
 
-# Authorization server
-The core of this library, it will create `Express` middlewares that will be attached
+## Authorization server
+The core of this library, it will create `Express` end-middlewares that will be attached
 to your server and handle the oauth requests.
 
 ```javascript
-import {AuthorizationServer} from "oauth2";
+import {AuthorizationServer, authorizationCode} from "oauth2";
 
+// Create new instance
 const authServer = new AuthorizationServer({/* options */});
-```
 
-## Options
-
-The authorization server has globalized some options that are needed for almost
-all the implementations. For more details go see the
-[`AuthorizationServerOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
-
-## Implementations
-`Implementation` is an oauth flow the authorization server supports.
-The authorization server has an abstract form, this helps to add more
-implementations without needing to edit the server itself.
-
-To add an implementation to the server:
-```javascript
-authServer.use(implementation);
-```
-
-Below you can see the supported oauth flows:
-
-### Authorization code
-
-```javascript
-import {authorizationCode} from "oauth2";
-
+// Register a new flow
 authServer.use(authorizationCode({/* options */}));
+
+// Register endpoints
+app.get('/oauth/v2/authorize', isLoggedIn, authServer.authorize());
+app.post('/oauth/v2/token', authServer.token());
 ```
 
-#### Options
-The authorization flow has extra options. For more details go see the
-[`AuthorizationCodeOptions`](./lib/implementations/authorizationCode/authorizationCodeOptions.ts).
+Click [here](./docs/authorization_server.md) for more details about the authorization server.
 
-#### Passport
-This library is compatible with passport authorization code flow.
-For more information about passport see [Passport.js](https://www.passportjs.org/)
-and [passport-oauth2](https://www.passportjs.org/packages/passport-oauth2/).
+### Flows
+`Flow` refers to an OAuth2 `Grant Type`. The [`AuthorizationServer`](docs/authorizationServer/authorization_server.md)
+can implement one or more different flows, without one affecting the other.
 
-### Client credentials
+The `oauth2` library comes together with some of the most popular flows:
+* [`Authorization Code`](./docs/authorization_code.md)
+* [`Client Credentials`](./docs/client_credentials.md)
+* [`Device Authorization`](./docs/device_authorization.md)
+* [`Implicit`](./docs/implicit.md)
+* [`Refresh Token`](./docs/refresh_token.md)
+* [`Resource Owner Credentials`](./docs/resource_owner_credentials.md)
+
+If the flows above does not match your needs you can always create one for yourself.
+To create one you have to inherit the [`Flow`](./lib/components/flow.ts) interface and like the
+rest of the flows above import them to your `AuthorizationServer` instance:
 
 ```javascript
-import {clientCredentials} from "oauth2";
-
-authServer.use(clientCredentials({/* options */}));
+authServer.use(my_flow);
 ```
 
-#### Options
-The client credentials flow has extra options. For more details go see the
-[`ClientCredentialsOptions`](./lib/implementations/clientCredentials/clientCredentialsOptions.ts).
+Click [here](docs/authorizationServer/new_flow.md) for mor details about how to create a new flow.
 
-###  Device flow
+### Events
+Using the NodeJs [`EventEmitter`](https://nodejs.dev/learn/the-nodejs-event-emitter) the `oauth2`
+library provides a set of useful events to help you keep track the progress of all the flows.
 
-```javascript
-import {deviceFlow} from "oauth2";
-
-authServer.use(deviceFlow({/* options */}));
-```
-
-#### Options
-The device flow has extra options. For more details go see the
-[`DeviceFlowOptions`](./lib/implementations/deviceFlow/deviceFlowOptions.ts).
-
-### Implicit
-
-```javascript
-import {implicit} from "oauth2";
-
-authServer.use(implicit({/* options */}));
-```
-
-#### Options
-The implicit flow does not have extra options.
-
-### Refresh token
-
-```javascript
-import {refreshToken} from "oauth2";
-
-authServer.use(refreshToken({/* options */}));
-```
-
-#### Options
-The refresh token flow has extra options. For more details go see the
-[`RefreshTokenOptions`](./lib/implementations/refreshToken/refreshTokenOptions.ts).
-
-### Resource owner credentials
-
-```javascript
-import {resourceOwnerCredentials} from "oauth2";
-
-authServer.use(resourceOwnerCredentials({/* options */}));
-```
-
-#### Options
-The resource owner credentials flow has extra options. For more details go see the
-[`ResourceOwnerCredentialsOptions`](./lib/implementations/resourceOwnerCredentials/resourceOwnerCredentialsOptions.ts).
-
-### Add custom
-The authorization server can support flows that are not accompanied from this library.
-To create one you have to inherit the [`Implementation`](./lib/components/implementation.ts) interface.
-
-## Events
-With the help of Node.js [`Event Emitter`](https://nodejs.dev/learn/the-nodejs-event-emitter),
-the authorization library emits some useful events. You can listen to those events
-using:
-
+All you have to do is `import` the `Events` object and listen to the desired event:
 ```javascript
 import {Events} from "oauth2";
 
-authServer.on(Events.AUTHORIZATION_REDIRECT_URI_INVALID, function (req) {
+authServer.on(Events.EVENT_NAME, function (req) {
     // ...
 });
 ```
 
-Each event is accompanied by the request instance of current request.
-For example this can be used for logging, or checking if an
-authorization code is used twice.
+Click [here](docs/authorizationServer/events.md) for more details about the `oauth2` events.
 
-**Caution!** this can be a security problem if not handled right, because it
-may expose credentials such as `client_id`, `client_secret`, `access tokens` or
-`refresh tokens`.
+### Functions & Endpoints
+The [`AuthorizationServer`](docs/authorizationServer/authorization_server.md) instance provides
+some functions to assign to your endpoints to expose the OAuth2 flows to your
+[`Express`](https://expressjs.com/) server.
 
-### Authorization endpoint
-* `AUTHORIZATION_REDIRECT_URI_INVALID`: If the client passes an invalid redirect uri
-at authorization.
-* `AUTHORIZATION_SCOPES_INVALID`: The scopes the client passed are not valid.
-* `AUTHORIZATION_USERGAENT_INVALID`: The user agent did not pass the checks (embedded web view, bot).
-* `AUTHORIZATION_RESPONSE_TYPE_UNSUPPORTED`: The client asked for an implementation at the authorization endpoint that does not exist.
-* `AUTHORIZATION_RESPONSE_TYPE_REJECT`: The client is no eligible for this implementation.
+These functions are:
+* `authorize`: To expose the authorization flow (where the user authorizes an application).
+* `token`: To expose the token flow (where an app requests for tokens).
+* `device`: Used for the [`Device Authorization`](./docs/flows/device_authorization.md) flow.
+* `introspection`: A mechanism for the resource servers to obtain information about access tokens.
+* `revocation`: To allow access or refresh tokens revocation.
+* `authenticate`: A way to authenticate access tokens (if authorization and resource server are the same).
 
-#### Authorization Code
-* `AUTHORIZATION_FLOWS_CODE_PKCE_INVALID`: PKCE arguments were missing or invalid.
-* `AUTHORIZATION_FLOWS_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+Click [here](docs/authorizationServer/functions_and_endpoints.md) for more details about functions and endpoints.
 
-#### Implicit
-* `AUTHORIZATION_FLOWS_TOKEN_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
+### State
+If you have read all the documentation so far I am sure you have noticed how all options that provide
+a function (method) also pass an `Ecpress Request` instance of the current request. Using that object
+you can create a state between the called option functions (methods).
 
-### Token endpoint
-* `TOKEN_GRANT_TYPE_UNSUPPORTED`: The client asked for an implementation at the token endpoint that does not exist.
-
-#### Authorization Code
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_JWT_INVALID`: The authorization code did not pass the JWT authentication (expired or invalid).
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_CLIENT_INVALID`: The authorization code does not belong to the client_id.
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_TOKEN_DB_INVALID`: The authorization code not found in the database.
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_REDIRECT_URI_INVALID`: The redirect uri is not the same as the one that generated the authorization code.
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_PKCE_INVALID`: The PKCE protection failed.
-* `TOKEN_FLOWS_AUTHORIZATION_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
-
-#### Client credentials
-* `TOKEN_FLOWS_CLIENT_CREDENTIALS_SCOPES_INVALID`: The scopes the client passed are not valid.
-* `TOKEN_FLOWS_CLIENT_CREDENTIALS_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
-* `TOKEN_FLOWS_CLIENT_CREDENTIALS_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
-
-#### Device flow
-* `TOKEN_FLOWS_DEVICE_CODE_SLOW_DOWN`: The client made a request too early.
-* `TOKEN_FLOWS_DEVICE_CODE_DEVICE_CODE_INVALID`: Device code not found in database.
-* `TOKEN_FLOWS_DEVICE_CODE_EXPIRED`: The client made a request and the response was `expired_token`.
-* `TOKEN_FLOWS_DEVICE_CODE_PENDING`: The client made a request and the response was `authorization_pending`.
-* `TOKEN_FLOWS_DEVICE_CODE_ACCESS_DENIED`: The client made a request and the response was `access_denied` (the user denied the authorization).
-* `TOKEN_FLOWS_DEVICE_CODE_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
-
-#### Resource owner credentials
-* `TOKEN_FLOWS_PASSWORD_SCOPES_INVALID`: The scopes the client passed are not valid.
-* `TOKEN_FLOWS_PASSWORD_CLIENT_INVALID`: Client did not pass the authentication (`client_id` and `client_secret`).
-* `TOKEN_FLOWS_PASSWORD_USER_INVALID`: User sent invalid credentials
-* `TOKEN_FLOWS_PASSWORD_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
-
-#### Refresh token
-* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_JWT_INVALID`: The refresh token did not pass the JWT authentication.
-* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_NOT_REFRESH_TOKEN`: The passed token was not a refresh token.
-* `TOKEN_FLOWS_REFRESH_TOKEN_SCOPES_INVALID`: The scopes the client passed are not valid.
-* `TOKEN_FLOWS_REFRESH_TOKEN_CLIENT_INVALID`: The refresh token does not belong to client id, or client authentication failed.
-* `TOKEN_FLOWS_REFRESH_TOKEN_TOKEN_DB_INVALID`: The refresh token not found in the database.
-* `TOKEN_FLOWS_REFRESH_TOKEN_SAVE_ERROR`: Function `saveTokens` returned false (did not succeed).
-
-### Device endpoint
-* `DEVICE_GRANT_TYPE_UNSUPPORTED`: The client asked for an implementation at the device endpoint that does not exist.
-* `DEVICE_SCOPES_INVALID`: The scopes the client passed are not valid.
-
-#### Device flow
-* `DEVICE_FLOWS_TOKEN_CLIENT_INVALID`: Client did not pass authentication (`client_id` not registered).
-* DEVICE_FLOWS_TOKEN_SAVE_ERROR: Function `saveTokens` returned false (did not succeed).
-
-### Authentication endpoint
-* `AUTHENTICATION_TOKEN_MISSING`: No token provided when authenticating a request.
-* `AUTHENTICATION_TOKEN_JWT_EXPIRED`: The access token did not pass the JWT authentication.
-* `AUTHENTICATION_TOKEN_DB_EXPIRED`: The access token not found in the database.
-* `AUTHENTICATION_TOKEN_NOT_ACCESS_TOKEN`: The token is not an access token.
-* `AUTHENTICATION_SCOPES_INVALID`: The scopes of the access token are insufficient.
-
-## Endpoints
-The authorization server provides some endpoints that will be assigned to your Express server.
 For example:
 ```javascript
-app.get('/oauth/v2/authorize', authServer.authorize());
+// During authorization
+validateRedirectURI: async (client_id, redirect_uri, req) => {
+    return !!(await db.findClient(client_id, redirect_uri));
+}
+
+// And then during scope validation
+validateScopes: async (scopes, req) => {
+    const client = await db.findClient(client_id, redirect_uri);
+    return scopes.every(scope => client.scopes.includes(scope));
+}
+```
+can be transformed into this:
+```javascript
+// During authorization
+validateRedirectURI: async (client_id, redirect_uri, req) => {
+    const client = await db.findClient(client_id, redirect_uri);
+    if(!client) return false;
+
+    // The scopes a client is allowed to request.
+    // Depending on the implementation in may be all the available scopes
+    req.scopes = client.scopes;
+    return true;
+}
+
+// And then during scope validation
+// One less request.
+validateScopes: (scopes, req) => scopes.every(scope => req.scopes.includes(scope));
 ```
 
-### Authorize
-The authorization endpoint. This endpoint is called when the user is authorizing the application.
-In this endpoint you have to authenticate the user before reaching the `authorize` function.
-For example:
+To be able to achieve this, the order where the options are called is necessary.
+
+Read more at the break-down section of the
+[`functions`](./docs/authorizationServer/functions_and_endpoints.md)
+and about [`each flow`](./docs/flows). 
+
+## Resource server
+The resource server is the OAuth 2.0 term for your API server. The resource server handles
+authenticated requests after the application has obtained an access token.
 
 ```javascript
-app.get('/oauth/v2/authorize', function (req, res, next) {
-    if(userAuthenticated(req)) {
-        if(userAuthorized(req))
-            req.user = {/* user's identification */};
-        else req.user = null;
-        next();
-    }
-    
-    res.end('User is not authenticated.');
-}, authServer.authorize());
+import {ResourceServer} from "oauth2";
+
+const resoourceServer = new ResourceServer({/* options */});
 ```
 
-The authorization endpoint must be accessed with the method `GET` and all data are accessed
-from the query.
+Click [here](./docs/resource_server.md) for more details about the resource server.
 
-Before reaching the desired implementation, the authorization endpoint will call the following
-functions, so that it can to some basic checks:
-* validateRedirectURI
-* isTemporaryUnavailable
-* rejectEmbeddedWebViews
-* isGrantTypeAllowed
-* validateScopes
+## Security Considerations
+The `oauth2` library will try its best to protect you from outside threats, but the problems
+does not end there. Leakage of codes and access tokens can happen from the authorization server
+or the client's side.
 
-All these functions are initialized at the [AuthorizationServerOptions](#options)
-
-### Token
-The token endpoint. This endpoint is called from the client directly without the need to
-authorize the user. Each flow will require the user to identify itself (e.x. `client_secret`).
-For example:
-
-```javascript
-app.post('/oauth/v2/token', authServer.token());
-```
-
-The token endpoint must be accessed with the method `POST` and all data are accessed
-from the body. The oauth2 specifies that the data are in query form (e.x. `name=mike&age=16`),
-so you have to use the `urlEncoded` body parser with `extended` set to `true`.
-
-```javascript
-app.post('/oauth/v2/token',
-    express.urlencoded({type: "application/x-www-form-urlencoded", extended: true}),
-    authServer.token());
-```
-or
-```javascript
-app.use(express.urlencoded({type: "application/x-www-form-urlencoded", extended: true}));
-app.post('/oauth/v2/token', authServer.token());
-```
-
-### Device
-The device endpoint. Like token, this endpoint will be called from the client directly
-without the need to authorize the user. This endpoint is used for the first phase of the device flow.
-
-```javascript
-app.post('/oauth/v2/device', authServer.device());
-```
-
-The device endpoint must be accessed with the method `POST` and all data are accessed
-from the body.
-
-### Introspection
-The introspection endpoint. Unlike the others, this endpoint is used by the resource server(s)
-and is meant to be private to only them. When a request arrives to the resource server to access
-a protected content, the resource server will send the token that accompanies the request to
-the authorization server and ask if it is valid. The authorization server will respond with
-a json that contains if it is `active` and some other information about the token.
-
-```javascript
-app.post('/oauth/v2/introspection', authServer.introspection());
-```
-
-The introspection endpoint must be accessed with the method `POST` and all data are accessed
-from the body.
-
-### Authenticate
-This is more like a functionality and not an endpoint. There are cases where the
-authorization server and the resource server are one and the same. In these case, the
-function `authenticate` will act as a middleware to authenticate the request before accessing
-the protected content.
-
-```javascript
-app.get('/protected', authServer.authenticate(), function (req, res) {
-    // ...
-});
-```
-
-This function does not limit the used method.
-
-If you want to authenticate a protected resource based on a specific scope then
-pass as the first argument the scopes you want to be required.
-
-```javascript
-authServer.authenticate('scope1');
-```
-or with multiple scopes
-```javascript
-// Access token must have all scopes present
-authServer.authenticate(['scope1', 'scope2', 'scope3'], 'all'); // Default
-
-// Access token must have at least one of them.
-authServer.authenticate(['scope1', 'scope2', 'scope3'], 'some');
-```
-
-# Resource server
-
-## Options
-
-# Client
-
-## Options
+Click [here](./docs/security_consideration.md) for more details.

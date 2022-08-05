@@ -1,4 +1,4 @@
-export type ExpressMiddleware = (req: any, res: any, next: any) => void;
+export type ExpressMiddleware = (req: any, res: any, next: any) => any;
 
 export type ARTokens = {
     access_token: string;
@@ -28,9 +28,7 @@ export type THAuthorizationCodeSave = {
     authorizationCode: string;
     expiresAt: number;
     clientId: string;
-    scopes: string[];
     user: any;
-    redirectUri: string;
     codeChallenge?: string;
     codeChallengeMethod?: string;
 };
@@ -38,7 +36,7 @@ export type THAuthorizationCodeSave = {
 export type THAuthorizationCodeAsk = {
     authorizationCode: string;
     clientId: string;
-    user: string;
+    user: any;
 };
 
 export type THAccessTokenAsk = {
@@ -50,7 +48,7 @@ export type THAccessTokenAsk = {
 export type THRefreshTokenAsk = {
     refreshToken: string;
     clientId: string;
-    user: string;
+    user: any;
 };
 
 export type DFCodeSave = {
@@ -67,3 +65,15 @@ export type DFCodeAsk = {
     clientId: string;
     deviceCode: string;
 };
+
+export type RevocationAsk = {
+    what: 'access_token' | 'refresh_token' | 'record';
+    clientId: string;
+    user?: any;
+} & ({
+    accessToken: string;
+} | {
+    refreshToken: string;
+});
+
+export type PlusUN<T> = T | null | undefined;

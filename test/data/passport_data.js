@@ -31,7 +31,9 @@ const authCodeStrategy = new OAuth2Strategy({
         }
     });
 });
+
 authCodeStrategy.userProfile = function (accessToken, done) {
+
     // Request user profile here using access token
     done(null, {
         name: 'name',

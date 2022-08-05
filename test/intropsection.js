@@ -2,12 +2,17 @@ const chai = require('chai');
 const axios = require("axios");
 const DATA = require("./data/data");
 const express = require("express");
-const buildQuery = require("../dist/modules/utils").buildQuery;
+const buildQuery = require("../dist/utils/utils").buildQuery;
 const {ResourceServer} = require('../dist');
 
 
 let resServer = new ResourceServer({
-    introspectionURL: DATA.AUTHORIZATION_URL + '/oauth/v2/introspection'
+    introspectionURL: DATA.AUTHORIZATION_URL + '/oauth/v2/introspection',
+    audience: "me",
+    body: {
+        client_id: DATA.CLIENT_ID,
+        client_secret: DATA.CLIENT_SECRET
+    }
 });
 
 const clientExpress = express();

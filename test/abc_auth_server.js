@@ -7,7 +7,7 @@ const {
     resourceOwnerCredentials,
     refreshToken,
     authorizationCode,
-    deviceFlow,
+    deviceAuthorization,
     Events
 } = require("../dist");
 
@@ -30,6 +30,11 @@ let authSrv = new AuthorizationServer({
             return authSrvDB.accessToken;
         return null;
     },
+    getRefreshToken: data => {
+        if (authSrvDB.refreshToken === data.refreshToken)
+            return authSrvDB.refreshToken;
+        return null;
+    },
     saveTokens: (data, req) => {
         // console.log('Saving tokens', data)
         authSrvDB = data;
@@ -38,11 +43,26 @@ let authSrv = new AuthorizationServer({
     validateRedirectURI: (client_id, redirect_uri) =>
         client_id === DATA.CLIENT_ID
         && [DATA.CLIENT_CALLBACK_URL, DATA.CLIENT_IMPLICIT_CALLBACK_URL].includes(redirect_uri),
-    isImplementationAllowed: (client_id, type) => true,
-    isTemporaryUnavailable: req => false,
+    isFlowAllowed: (client_id, type, req) => true,
+    isTemporarilyUnavailable: req => false,
     validateRequest: (req) => true,
     setPayloadLocation: (req, payload) => req.payload = payload,
-    getClientCredentials: 'body'
+    getClientCredentials: 'body',
+    issuer: 'me',
+    validateClient: (client_id, client_secret) =>
+        client_id === DATA.CLIENT_ID && (client_secret === undefined ? true : client_secret === DATA.CLIENT_SECRET),
+    revoke: (data, req) => {
+        if(data.what === 'access_token')
+            authSrvDB.accessToken = '';
+        else if(data.what === 'refresh_token')
+            authSrvDB.refreshToken = '';
+        else if(data.what === 'record') {
+            if (authSrvDB.refreshToken === data.refreshToken)
+                authSrvDB = {};
+        }
+
+        return true;
+    }
 });
 
 authSrv.use(authorizationCode({
@@ -62,41 +82,19 @@ authSrv.use(authorizationCode({
     saveAuthorizationCode: data => {
         authCodeDB = data;
         return true;
-    },
-    validateClient: (client_id, client_secret) =>
-        client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
+    }
 }));
 authSrv.use(implicit());
-authSrv.use(clientCredentials({
-    validateClient: (client_id, client_secret) =>
-        client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET
-}));
+authSrv.use(clientCredentials());
 authSrv.use(resourceOwnerCredentials({
-    validateClient: (client_id, client_secret) =>
-        client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
     validateUser: (username, password) =>
         username === DATA.USERNAME && password === DATA.PASSWORD,
 }));
-authSrv.use(refreshToken({
-    validateClient: (client_id, client_secret) =>
-        client_id === DATA.CLIENT_ID && client_secret === DATA.CLIENT_SECRET,
-    deleteTokens: data => {
-        // console.log('DELETING', authSrvDB.refreshToken === data.refreshToken)
-        if (authSrvDB.refreshToken === data.refreshToken)
-            authSrvDB = {};
-        return true;
-    },
-    getRefreshToken: data => {
-        if (authSrvDB.refreshToken === data.refreshToken)
-            return authSrvDB.refreshToken;
-        return null;
-    }
-}));
-authSrv.use(deviceFlow({
+authSrv.use(refreshToken());
+authSrv.use(deviceAuthorization({
     expiresIn: 60,
     interval: 3,
     verificationURI: 'https://example.com/device',
-    validateClient: client_id => client_id === DATA.CLIENT_ID,
     getUser: (deviceCode, userCode) => {
         return {id: 'user-id'};
     },
@@ -126,13 +124,13 @@ authSrv.use(deviceFlow({
 }));
 
 
-authSrv.on(Events.AUTHENTICATION_TOKEN_JWT_EXPIRED, req => {
+authSrv.on(Events.AUTHENTICATION_INVALID_TOKEN_JWT, req => {
     // console.log('jwt-expired');
 });
-authSrv.on(Events.AUTHENTICATION_TOKEN_DB_EXPIRED, req => {
+authSrv.on(Events.AUTHENTICATION_INVALID_TOKEN_DB, req => {
     // console.log('db-expired');
 });
-authSrv.on(Events.TOKEN_FLOWS_DEVICE_CODE_PENDING, req => {
+authSrv.on(Events.REQUEST_PENDING, req => {
     devicePendingRequestCounter++;
     if (devicePendingRequestCounter === 2)
         deviceDB.status = 'completed';
@@ -146,7 +144,7 @@ authorizationExpress.use(express.json({type: "application/json"}));
 authorizationExpress.get('/oauth/v2/authorize', function (req, res, next) {
     //console.log('AUTHORIZE:', req.query);
     // Verify user ...
-    req.loggedInUser = `username`
+    req.loggedInUser = "username"
 
     next();
 }, authSrv.authorize());
@@ -157,17 +155,23 @@ authorizationExpress.post('/oauth/v2/token', function (req, res, next) {
     next();
 }, authSrv.token());
 
-authorizationExpress.post('/oauth/v2/device', function (req, res, next) {
-    //console.log('TOKEN:', req.body, req.query);
+authorizationExpress.post('/oauth/v2/device_authorization', function (req, res, next) {
+    //console.log('device:', req.body, req.query);
     // console.log(req)
     next();
-}, authSrv.device());
+}, authSrv.deviceAuthorization());
 
 authorizationExpress.post('/oauth/v2/introspection', function (req, res, next) {
-    //console.log('TOKEN:', req.body, req.query);
+    //console.log('introspection:', req.body, req.query);
     // console.log(req)
     next();
 }, authSrv.introspection());
+
+authorizationExpress.post('/oauth/v2/revocation', function (req, res, next) {
+    //console.log('revocation:', req.body, req.query);
+    // console.log(req)
+    next();
+}, authSrv.revocation());
 
 authorizationExpress.get('/protected', authSrv.authenticate(), function (req, res) {
     res.status(200).end('protected-content');
