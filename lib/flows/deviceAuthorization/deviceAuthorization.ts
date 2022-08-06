@@ -109,9 +109,15 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
 
                 // The signed JWT is internal and will never go to any user or client
                 const bucket = signToken({
-                    deviceCode: device_code,
-                    clientId: data.clientId
-                }, data.serverOpts.secret, options.interval, data.serverOpts.issuer, data.serverOpts.issuer);
+                    payload: {
+                        deviceCode: device_code,
+                        clientId: data.clientId
+                    },
+                    secret: data.serverOpts.secret,
+                    expiresIn: options.interval,
+                    issuer: data.serverOpts.issuer,
+                    audience: data.serverOpts.issuer
+                });
                 await options.saveBucket(device_code, bucket, options.interval!, data.req);
 
                 // Get saved device
@@ -153,7 +159,16 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                 }, data.req);
 
                 // Generate access & refresh tokens
-                let tokens = await generateARTokens(data.req, {user}, data.clientId, dbDev.scopes, data.serverOpts, data.issueRefreshToken);
+                let tokens = await generateARTokens({
+                    req: data.req,
+                    payload: {
+                        user
+                    },
+                    clientId: data.clientId,
+                    scopes: dbDev.scopes,
+                    opts: data.serverOpts,
+                    issueRefreshToken: data.issueRefreshToken
+                });
 
                 // Database save
                 let dbRes = await data.serverOpts.saveTokens({

@@ -12,7 +12,16 @@ export function implicit(opts?: ImplicitOptions): Flow {
         function: async (data, callback, eventEmitter) => {
 
             // Generate access token
-            let tokens = await generateARTokens(data.req, {user: data.user}, data.clientId, data.scopes!, data.serverOpts, false);
+            let tokens = await generateARTokens({
+                req: data.req,
+                payload: {
+                    user: data.user
+                },
+                clientId: data.clientId,
+                scopes: data.scopes!,
+                opts: data.serverOpts,
+                issueRefreshToken: false
+            });
 
             // Database save
             let dbRes = await data.serverOpts.saveTokens({

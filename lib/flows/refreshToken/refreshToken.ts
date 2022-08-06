@@ -91,7 +91,16 @@ export function refreshToken(opts?: RefreshTokenOptions): Flow {
             }, data.req);
 
             // Generate new tokens
-            let tokens = await generateARTokens(data.req, {user: refreshTokenPayload.user}, data.clientId, scopes, data.serverOpts, data.issueRefreshToken);
+            let tokens = await generateARTokens({
+                req: data.req,
+                payload: {
+                    user: refreshTokenPayload.user
+                },
+                clientId: data.clientId,
+                scopes,
+                opts: data.serverOpts,
+                issueRefreshToken: data.issueRefreshToken
+            });
 
             // Database save
             let dbRes = await data.serverOpts.saveTokens({

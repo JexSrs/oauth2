@@ -49,9 +49,7 @@ import {Events} from "./components/events";
 // TODO - Add option deleteAfterUse. This option if set to true, access tokens can only be used once and deleted immediately after use (when passing authenticate and/or introspection functions they will be deleted)
 //      - Be careful here, when the token is used twice at the same time (maybe add a delay before asking database?).
 
-// TODO - Add refresh token refresh count (2 possibilities):
-//      -   1) A refresh token can execute the refresh flow x times.
-//      -   2) An authorization can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
+// TODO - Add refresh token refresh count, can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
 
 // TODO - Add notBefore in options for jwt. It will be fixed value like accessTokenLifetime.
 // TODO - Maybe add a function to determinate the lifetime & notBefore of tokens (access & refresh).

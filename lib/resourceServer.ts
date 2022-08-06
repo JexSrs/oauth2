@@ -82,6 +82,7 @@ export class ResourceServer {
                         noCache: false
                     });
 
+
                 // Check scopes
                 if(scopes) {
                     let dataScopes = data.scope.split(options.scopeDelimiter);
@@ -111,6 +112,25 @@ export class ResourceServer {
                     status: 503
                 })
             });
+        };
+    }
+
+    public authenticateJWT(scope?: string | string[], cond?: 'all' | 'some'): ExpressMiddleware {
+        const options = Object.assign(this.options, {});
+
+        let scopes: string[] | undefined = Array.isArray(scope) ? scope : (scope ? [scope] : undefined);
+        let condition = cond || 'all';
+
+        // TODO - Authenticate using JWT and not introspection url (make introspectionURL or secret mandatory in options)
+        //      - Merge two functions as one, put an 'if' before flow to check if introspectionURL or secret is defined)
+
+        return (req, res, next) => {
+            let token = options.getToken(req);
+
+            // validate that header 'typ' is either `at+jwt` or 'application/at+jwt' (reject otherwise)
+            // Validate 'iss', 'aud' claim
+            // Reject if header 'alg' is 'none'. Throw invalid_token if any of the above is not valid
+
         };
     }
 }

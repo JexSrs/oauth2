@@ -146,8 +146,6 @@ export type AuthorizationServerOptions = {
     errorUri?: string;
     /**
      * Used by all the flows and to inquire about where the generated tokens are meant to be used.
-     * Also used by the `introspection` function
-     * to verify if the token in question is meant for the resource server that made the request.
      * It defaults to `issuer`, which specifies that is meant to be used only to authorization server.
      *
      * This option also supports asynchronous calls.
@@ -155,8 +153,8 @@ export type AuthorizationServerOptions = {
      * @param req The request instance.
      */
     audience?: string
-        | ((client_id: any, req: any) => string)
-        | ((client_id: any, req: any) => Promise<string>);
+        | ((client_id: any, scopes: string[], req: any) => string)
+        | ((client_id: any, scopes: string[], req: any) => Promise<string>);
     /**
      * Used by the `authorize` function to check if the authorization endpoint can be called
      * from the `POST` method (aside the `GET` method). It defaults to `false`.
@@ -215,6 +213,8 @@ export type AuthorizationServerOptions = {
      * In case you want to proceed with the request but omit invalid scopes you can return
      * a subset of the requested scopes. It is not mandatory to return a subset of the existing
      * scopes, but it is highly recommended.
+     *
+     * You should return `false` if the scopes refer to different resource servers.
      *
      * This option also supports asynchronous calls.
      * @param scopes The scopes array.

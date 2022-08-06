@@ -54,7 +54,16 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
             }
 
             // Generate access & refresh tokens
-            let tokens = await generateARTokens(data.req, {user}, data.clientId, scopes, data.serverOpts, data.issueRefreshToken);
+            let tokens = await generateARTokens({
+                req: data.req,
+                payload: {
+                    user
+                },
+                clientId: data.clientId,
+                scopes,
+                opts: data.serverOpts,
+                issueRefreshToken: data.issueRefreshToken
+            });
 
             // Database save
             let dbRes = await data.serverOpts.saveTokens({

@@ -34,11 +34,13 @@ You can see with more detail the specs that was used below:
 * [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics)
 
 ### Notes
-* In spec
-[RFC9068](https://datatracker.ietf.org/doc/html/rfc9068) (JWT Profile for OAuth 2.0 Access Tokens)
-the claim `sub` (subject) must contain the user's or client'd id.
+* [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068) (JWT Profile for OAuth 2.0 Access Tokens)
+  * The claim `sub` (subject) must contain the user's or client'd id.
 The user's id in this library can be any valid json or primitive type which does not comply
 with the claim's (`sub`) type which is string. It will be replaced inside the payload by the field `user`.
+  * The parameter `resource` will not be used, instead the Authorization Server
+should decide the `audience` claim using the [`audience`](./docs/authorizationServer#audience)
+option.
 
 ## Installation
 This library is not in [npm](https://www.npmjs.com/). To use it you have to clone the repository to

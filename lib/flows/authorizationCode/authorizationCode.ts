@@ -74,7 +74,13 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                     scopes: data.scopes!,
                     user: data.user
                 };
-                let code = signToken(payload, data.serverOpts.secret, options.authorizationCodeLifetime, data.serverOpts.issuer, data.serverOpts.issuer);
+                let code = signToken({
+                    payload,
+                    secret: data.serverOpts.secret,
+                    expiresIn: options.authorizationCodeLifetime,
+                    issuer: data.serverOpts.issuer,
+                    audience: data.serverOpts.issuer
+                });
 
                 // Save authorization code to database
                 let dbRes = await options.saveAuthorizationCode({
@@ -194,9 +200,16 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                 }, data.req);
 
                 // Generate access & refresh tokens
-                let tokens = await generateARTokens(data.req, {
-                    user: dbCode.user
-                }, data.clientId, authCodePayload.scopes, data.serverOpts, data.issueRefreshToken);
+                let tokens = await generateARTokens({
+                    req: data.req,
+                    payload: {
+                        user: dbCode.user
+                    },
+                    clientId: data.clientId,
+                    scopes: authCodePayload.scopes,
+                    opts: data.serverOpts,
+                    issueRefreshToken: data.issueRefreshToken
+                });
 
                 // Database save
                 let dbRes = await data.serverOpts.saveTokens({

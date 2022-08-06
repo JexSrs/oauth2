@@ -28,7 +28,14 @@ export function clientCredentials(opts?: ClientCredentialsOptions): Flow {
             }
 
             // Generate access token
-            let tokens = await generateARTokens(data.req, {}, data.clientId, scopes, data.serverOpts, false);
+            let tokens = await generateARTokens({
+                req: data.req,
+                payload: {},
+                clientId: data.clientId,
+                scopes,
+                opts: data.serverOpts,
+                issueRefreshToken: false
+            });
 
             // Save to database
             let dbRes = await data.serverOpts.saveTokens({

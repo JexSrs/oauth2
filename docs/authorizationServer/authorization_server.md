@@ -303,12 +303,17 @@ scopes, but it is highly recommended.
 
 ```javascript
 validateScopes: (scopes, req) => {
+    if(!isScopesValid(scopes))
+        return false;
+    
     if(scopes.includes('no-valid-scope'))
         removeStringFromArray(scopes, 'no-valid-scope');
     
     return scopes;
 }
 ```
+
+You should return `false` if the scopes refer to different resource servers.
 
 ### `secret`
 The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
