@@ -10,14 +10,16 @@ import {randStr} from "./utils";
  * @param expiresIn The expiration time in seconds.
  * @param audience
  * @param issuer
+ * @param subject
  * @return {string} The token.
  */
 export function signToken(payload: object, secret: string, expiresIn: number | undefined, audience: string, issuer: string): string {
     return jwt.sign(payload, secret, {
+        // algorithm: 'RS256',
         expiresIn,
         audience,
         issuer,
-        jwtid: randStr(32)
+        jwtid: randStr(32),
     });
 }
 
@@ -46,6 +48,7 @@ export function verifyToken(token: string, secret: string, audience: string | un
  * Will generate the access and refresh tokens and generate the response for the client.
  * @param req
  * @param payload The data that will be included inside the tokens
+ * @param user
  * @param client_id The client's id that the tokens belongs to (will be included to the payload).
  * @param scopes The requested scopes (will be included to the payload).
  * @param opts The server's options

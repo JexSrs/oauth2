@@ -1,7 +1,7 @@
 import {Flow} from "../../components/flow";
 import {generateARTokens, getTokenExpiresAt, signToken, verifyToken} from "../../utils/tokenUtils";
 import {DeviceAuthorizationOptions} from "./daOptions.js";
-import {error, randStr} from "../../utils/utils";
+import {error, randStr, userCodeGenerator} from "../../utils/utils";
 import {Events} from "../../components/events";
 
 export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
@@ -17,7 +17,7 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
         options.deviceCodeGenerator = (client_id, req) => randStr(64);
 
     if (options.userCodeGenerator === undefined)
-        options.userCodeGenerator = (client_id, req) => `${randStr(4)}-${randStr(4)}`;
+        options.userCodeGenerator = (client_id, req) => userCodeGenerator();
 
     if (options.verificationURI.trim().length === 0)
         throw new Error('verificationURI must be non empty string');
@@ -105,7 +105,10 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                 }
 
                 // The signed JWT is internal and will never go to any user or client
-                const bucket = signToken({deviceCode: device_code}, data.serverOpts.secret, options.interval, data.serverOpts.issuer, data.serverOpts.issuer);
+                const bucket = signToken({
+                    deviceCode: device_code,
+                    clientId: data.clientId
+                }, data.serverOpts.secret, options.interval, data.serverOpts.issuer, data.serverOpts.issuer);
                 await options.saveBucket(device_code, bucket, options.interval!, data.req);
 
                 // Get saved device

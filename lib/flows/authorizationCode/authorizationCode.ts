@@ -70,9 +70,9 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                 // Generate authorization code
                 let payload = {
                     client_id: data.clientId,
-                    user: data.user,
                     redirectUri: redirect_uri,
                     scopes: data.scopes!,
+                    user: data.user
                 };
                 let code = signToken(payload, data.serverOpts.secret, options.authorizationCodeLifetime, data.serverOpts.issuer, data.serverOpts.issuer);
 

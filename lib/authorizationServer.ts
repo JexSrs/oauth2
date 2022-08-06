@@ -12,9 +12,7 @@ import {Events} from "./components/events";
 // https://datatracker.ietf.org/doc/html/rfc8705
 
 
-// TODO - https://datatracker.ietf.org/doc/html/rfc8628 (Already in readme)
-// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
-// TODO - https://datatracker.ietf.org/doc/html/rfc9068
+// TODO - https://datatracker.ietf.org/doc/html/rfc9068 (Already in readme)
 // TODO - OpenID Connect - https://openid.net/connect/ - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 // TODO - indieAuth - https://indieauth.spec.indieweb.org/
 // TODO - UMA2 - https://docs.kantarainitiative.org/uma/wg/rec-oauth-uma-grant-2.0.html
@@ -40,8 +38,10 @@ import {Events} from "./components/events";
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 //      - https://duckduckgo.com/?t=ffab&q=OAuth-HTTP-MAC&ia=web
 
+// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
 
-// TODO - https://datatracker.ietf.org/doc/html/rfc6819#section-5.2.2.5
+// TODO - Device identification - https://datatracker.ietf.org/doc/html/rfc6819#section-5.2.2.5
+// TODO - device endpoint - https://datatracker.ietf.org/doc/html/rfc8628#section-5.1
 
 // TODO - Add more functions such as revokeTokenForClient, revokeAllTokensForClient, revokeTokenForUser, revokeAllTokensForUser etc.
 // TODO - Also add functions like generateClient(name, image_ur, etc): (id, secret), revokeClient (and obviously all its tokens) etc.
@@ -399,7 +399,7 @@ export class AuthorizationServer {
                 active: true,
                 scope: payload.scopes.join(options.scopeDelimiter),
                 client_id: payload.client_id,
-                username: payload.user,
+                user: payload.user,
                 token_type: 'Bearer',
                 exp: payload.exp,
                 iat: payload.iat,
@@ -478,7 +478,6 @@ export class AuthorizationServer {
                     .end(null);
                 return
             }
-
 
             return res.status(200).end(null);
         }
@@ -574,6 +573,10 @@ export class AuthorizationServer {
                 clientId: payload.client_id,
                 user: payload.user,
                 scopes: payload.scopes,
+                aud: payload.aud,
+                iss: payload.iss,
+                jti: payload.jti,
+                iat: payload.iat
             });
             next();
         };

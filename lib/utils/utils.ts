@@ -40,6 +40,16 @@ export function randStr(length: number): string {
     return randomArray.join("");
 }
 
+export function userCodeGenerator(): string {
+    const chars = "BCDFGHJKLMNPQRSTVWXZ";
+    const randomArray = Array.from({ length: 8 },
+        (v, k) => chars[Math.floor(Math.random() * chars.length)]
+    );
+
+    const code = randomArray.join("");
+    return `${code.substring(0, 4)}-${code.substring(4, 8)}`;
+}
+
 /**
  * Will build and send the error response.
  * If a redirect uri is provided, the response will be redirected.

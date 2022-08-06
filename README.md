@@ -28,9 +28,16 @@ You can see with more detail the specs that was used below:
 * [RFC7662](https://datatracker.ietf.org/doc/html/rfc7662): Token Introspection
 * [RFC8252](https://datatracker.ietf.org/doc/html/rfc8252): OAuth 2.0 for Native Apps
 * [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628): Device Authorization Grant
-* [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068): JWT Profile for OAuth Access Tokens
-* [RFC9101](https://datatracker.ietf.org/doc/html/rfc9101): JWT Authorization Request
+* [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068): JWT Profile for OAuth 2.0 Access Tokens
+* [RFC9101](https://datatracker.ietf.org/doc/html/rfc9101): JWT-Secured Authorization Request
 * [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics)
+
+### Notes
+* In spec
+[RFC9068](https://datatracker.ietf.org/doc/html/rfc9068) (JWT Profile for OAuth 2.0 Access Tokens)
+the claim `sub` (subject) must contain the user's or client'd id.
+The user's id in this library can be any valid json or primitive type which does not comply
+with the claim's (`sub`) type which is string. It will be replaced inside the payload by the field `user`.
 
 ## Installation
 This library is not in [npm](https://www.npmjs.com/). To use it you have to clone the repository to

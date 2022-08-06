@@ -136,3 +136,11 @@ Fo more information read
 [Section 5.1.4.2.1](https://datatracker.ietf.org/doc/html/rfc6819#section-5.1.4.2.1)
 of OAuth 2.0 Threat Model and Security Considerations.
 
+## Device Authorization Session Spying
+While the device is pending authorization, a malicious user may physically spy on the
+device user interface and hijack the session by completing the authorization faster
+than the user that initiated it.
+
+Fo more information read
+[Section 5.5](https://datatracker.ietf.org/doc/html/rfc8628#section-5.5)
+of OAuth 2.0 Device Authorization Grant.
