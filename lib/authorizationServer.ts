@@ -128,7 +128,7 @@ export class AuthorizationServer {
 
         ['validateClient', 'validateRedirectURI', 'validateScopes', 'secret', 'issuer', 'saveTokens', 'getAccessToken', 'getRefreshToken']
             .forEach(field => {
-                if ((opts as any)[field] === undefined) throw new Error(`Field ${field} cannot be undefined`);
+                if ((opts as any)[field] === undefined) throw new Error(`AuthorizationServerException Field ${field} cannot be undefined`);
             });
 
         this.options = opts as Required<AuthorizationServerOptions>;

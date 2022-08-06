@@ -29,6 +29,11 @@ export type ResourceServerOptions = {
      */
     body?: { [key: string]: string | string[] };
     /**
+     * Used by the `authenticate` function of the `ResoureServer` to inquire the location
+     * of the `introspection` endpoint.
+     */
+    introspectionURL?: string;
+    /**
      * The delimiter that will be used to split the scope string.
      * It defaults to one space character (`' '`).
      */
@@ -40,14 +45,25 @@ export type ResourceServerOptions = {
      */
     errorUri?: string;
     /**
-     * Used by the `authenticate` function of the `ResoureServer` to inquire the location
-     * of the `introspection` endpoint.
-     */
-    introspectionURL: string;
-    /**
      * The resource server's `audience`. It will be used to inquire if the token send to the
      * `AuthorizationServer` through the `introspection` endpoint is meant to be used to
      * the current `ResourceServer`.
      */
     audience: string;
+    /**
+     * The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
+     *
+     * If you do not want to use the introspection endpoint for validating if
+     * an access token is valid, you can assign the same secret with the authorization server.
+     *
+     * By using this feature you will have a less request to the authorization server for every
+     * request (that needs authentication) in the resource server. On the other hand you will
+     * not be able to revoke an access token until it has expired on its own.
+     */
+    secret?: string;
+    /**
+     * If you use the `secret` option above you also have to define the `issuer` option
+     * with the same value as the authorization server `issuer` option.
+     */
+    issuer?: string;
 };

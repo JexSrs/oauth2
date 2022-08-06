@@ -12,11 +12,11 @@ export function signToken(data: {
     issuer: string;
 }): string {
     return jwt.sign(data.payload, data.secret, {
-        algorithm: 'RS256',
-        header: {
-            alg: 'RS256',
-            typ: 'at+jwt'
-        },
+        // algorithm: 'RS256',
+        // header: {
+        //     alg: 'RS256',
+        //     typ: 'at+jwt'
+        // },
         expiresIn: data.expiresIn,
         audience: data.audience,
         issuer: data.issuer,

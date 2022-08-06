@@ -71,3 +71,20 @@ The resource server's `audience`. It will be used to inquire if the token send t
 [`AuthorizationServer`](./authorizationServer/authorization_server.md)
 through the [`introspection`](./authorizationServer/functions_and_endpoints.md#introspection)
 endpoint is meant to be used to the current `ResourceServer`.
+
+### `secret`
+The [`AuthorizationServer`](./authorizationServer/authorization_server.md)
+uses JsonWebToken (JWT) for generating any kind of tokens.
+
+If you do not want to use the introspection endpoint for validating if
+an access token is valid, you can assign the same secret with the authorization server.
+
+By using this feature you will have a less request to the authorization server for every
+request (that needs authentication) in the resource server. On the other hand you will
+not be able to revoke an access token until it has expired on its own.
+
+### `issuer`
+If you use the [`secret`](#secret) option above you also have to define the `issuer` option
+with the same value as the authorization server
+[`issuer`](./authorizationServer/authorization_server.md#issuer)
+option.
