@@ -297,6 +297,19 @@ This option also supports asynchronous calls.
 validateScopes: (scopes, req) => scopes.every(scope => acceptedScopes.includes(scope));
 ```
 
+In case you want to proceed with the request but omit invalid scopes you can return
+a subset of the requested scopes. It is not mandatory to return a subset of the existing
+scopes, but it is highly recommended.
+
+```javascript
+validateScopes: (scopes, req) => {
+    if(scopes.includes('no-valid-scope'))
+        removeStringFromArray(scopes, 'no-valid-scope');
+    
+    return scopes;
+}
+```
+
 ### `secret`
 The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
 JWT uses an option called `secret` to sign these tokens.

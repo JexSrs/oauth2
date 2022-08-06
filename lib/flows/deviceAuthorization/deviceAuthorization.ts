@@ -31,13 +31,16 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                 const {scope} = data.req.body;
 
                 // Validate scopes
-                let scopes: string[] = scope?.split(data.serverOpts.scopeDelimiter) || [];
-                if (!(await data.serverOpts.validateScopes(scopes, data.req))) {
+                let scopes = scope?.split(' ') || [];
+                const scopeResult = await data.serverOpts.validateScopes(scopes, data.req);
+                if(Array.isArray(scopeResult))
+                    scopes = scopeResult;
+                else if (scopeResult === false) {
                     eventEmitter.emit(Events.INVALID_SCOPES, data.req);
                     return callback(undefined, {
                         error: 'invalid_scope',
                         error_description: 'One or more scopes are not acceptable',
-                        error_uri: options.errorUri,
+                        error_uri: options.errorUri
                     });
                 }
 

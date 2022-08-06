@@ -49,7 +49,6 @@ import {Events} from "./components/events";
 // TODO - Add option deleteAfterUse. This option if set to true, access tokens can only be used once and deleted immediately after use (when passing authenticate and/or introspection functions they will be deleted)
 //      - Be careful here, when the token is used twice at the same time (maybe add a delay before asking database?).
 
-// TODO - allow to limit requested scopes. How? return true if all scopes are valid, return false if the scopes are invalid, return a subset of the scopes if you want to reduce them.
 // TODO - Add refresh token refresh count (2 possibilities):
 //      -   1) A refresh token can execute the refresh flow x times.
 //      -   2) An authorization can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
@@ -257,7 +256,10 @@ export class AuthorizationServer {
 
             // Validate scopes
             let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
-            if (!(await options.validateScopes(scopes, req))) {
+            const scopeResult = await options.validateScopes(scopes, req);
+            if(Array.isArray(scopeResult))
+                scopes = scopeResult;
+            else if (scopeResult === false) {
                 this.eventEmitter.emit(Events.INVALID_SCOPES, req);
                 return error(res, {
                     error: 'invalid_scope',

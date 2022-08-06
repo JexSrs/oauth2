@@ -15,7 +15,10 @@ export function clientCredentials(opts?: ClientCredentialsOptions): Flow {
 
             // Validate scopes
             let scopes = scope?.split(' ') || [];
-            if (!(await data.serverOpts.validateScopes(scopes, data.req))) {
+            const scopeResult = await data.serverOpts.validateScopes(scopes, data.req);
+            if(Array.isArray(scopeResult))
+                scopes = scopeResult;
+            else if (scopeResult === false) {
                 eventEmitter.emit(Events.INVALID_SCOPES, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',

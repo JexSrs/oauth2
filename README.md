@@ -2,6 +2,7 @@
 
 ## Table of contents
 * [Introduction & Specifications](#introduction--specifications)
+  * [Notes](#notes)
 * [Installation](#installation)
 * [Authorization server](#authorization-server)
   * [Flows](#flows)

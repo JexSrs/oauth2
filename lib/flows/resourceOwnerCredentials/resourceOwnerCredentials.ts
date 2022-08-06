@@ -30,8 +30,11 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
                     error_uri: options.errorUri
                 });
 
-            let scopes = scope?.split(data.serverOpts.scopeDelimiter) || [];
-            if (!(await data.serverOpts.validateScopes(scopes, data.req))) {
+            let scopes = scope?.split(' ') || [];
+            const scopeResult = await data.serverOpts.validateScopes(scopes, data.req);
+            if(Array.isArray(scopeResult))
+                scopes = scopeResult;
+            else if (scopeResult === false) {
                 eventEmitter.emit(Events.INVALID_SCOPES, data.req);
                 return callback(undefined, {
                     error: 'invalid_scope',

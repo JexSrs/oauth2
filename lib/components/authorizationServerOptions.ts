@@ -212,13 +212,17 @@ export type AuthorizationServerOptions = {
      * scopes send by the client are valid. If the client does not
      * send a scope string an empty array will be passed.
      *
+     * In case you want to proceed with the request but omit invalid scopes you can return
+     * a subset of the requested scopes. It is not mandatory to return a subset of the existing
+     * scopes, but it is highly recommended.
+     *
      * This option also supports asynchronous calls.
      * @param scopes The scopes array.
      * @param req The request instance.
      * @return {boolean} True if scopes are valid, false otherwise.
      */
-    validateScopes: ((scopes: string[], req: any) => boolean)
-        | ((scopes: string[], req: any) => Promise<boolean>);
+    validateScopes: ((scopes: string[], req: any) => boolean | string[])
+        | ((scopes: string[], req: any) => Promise<boolean | string[]>);
     /**
      * The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
      * At JWT, `issuer` is the party that created the token and signed it with its private key
