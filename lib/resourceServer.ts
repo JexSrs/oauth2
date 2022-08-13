@@ -59,7 +59,10 @@ export class ResourceServer {
      */
     public authenticate(scope?: string | string[], cond?: 'all' | 'some', overrideOptions?: Partial<ResourceServerOptions>): ExpressMiddleware {
         const options = Object.assign({}, this.options, overrideOptions || {});
-
+        // TODO - change it:
+        //      - Verify JWT => if it fails respond with failed message.
+        //      - If introspectionURL is defined ask introspectionURL => if it fails respond with failed message
+        //      - Proceed with request (next())
         if(options.introspectionURL)
             return this.authenticateOnline(scope, cond);
         else return this.authenticateOffline(scope, cond);

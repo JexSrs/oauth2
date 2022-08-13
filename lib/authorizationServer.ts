@@ -1,59 +1,46 @@
 import {ExpressMiddleware, RevocationAsk} from "./components/types";
-import {buildQuery, error, isRedirectUriExactMatch} from "./utils/utils";
+import {buildQuery, error, isRedirectUriExactMatch, resolveUrl} from "./utils/utils";
 import {validateUserAgent} from "./utils/useragent";
-import {verifyToken} from './utils/tokenUtils'
+import {signToken, verifyToken} from './utils/tokenUtils'
 import {Flow} from "./components/flow";
 import {AuthorizationServerOptions} from "./components/authorizationServerOptions.js";
 import EventEmitter from "events";
 import {Events} from "./components/events";
+import {Metadata} from "./components/metadataTypes.js";
 
 
 // Will not be implemented (under discussion)
 // https://datatracker.ietf.org/doc/html/rfc8705
+// https://datatracker.ietf.org/doc/html/rfc9101
+// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-rar (experimental)
+// https://datatracker.ietf.org/doc/html/draft-fett-oauth-dpop (experimental)
+// https://datatracker.ietf.org/doc/html/draft-ietf-oauth-incremental-authz (experimental)
 
-
-// TODO - https://datatracker.ietf.org/doc/html/rfc9068 (Already in readme)
-// TODO - OpenID Connect - https://openid.net/connect/ - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
-// TODO - indieAuth - https://indieauth.spec.indieweb.org/
-// TODO - UMA2 - https://docs.kantarainitiative.org/uma/wg/rec-oauth-uma-grant-2.0.html
-// TODO - https://datatracker.ietf.org/doc/html/rfc7591
-// TODO - https://datatracker.ietf.org/doc/html/rfc7592
-// TODO - https://datatracker.ietf.org/doc/html/rfc9101 (Already in readme)
-
-// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-rar (experimental)
-// TODO - https://datatracker.ietf.org/doc/html/rfc9126 (experimental)
-// TODO - https://datatracker.ietf.org/doc/html/draft-fett-oauth-dpop (experimental)
-// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-incremental-authz (experimental)
+// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
 
 // TODO - https://datatracker.ietf.org/doc/html/rfc7521
 // TODO - https://datatracker.ietf.org/doc/html/rfc7523
 // TODO - https://datatracker.ietf.org/doc/html/rfc7522
 
-// TODO - https://datatracker.ietf.org/doc/html/rfc8414 - https://datatracker.ietf.org/doc/html/rfc8628#section-4
+// TODO - https://datatracker.ietf.org/doc/html/rfc9126 (experimental)
 
-// TODO - https://oauth.net/webauthn/
-// TODO - https://oauth.net/http-signatures/
-// TODO - https://oauth.net/id-tokens-vs-access-tokens/
+// TODO - OpenID Connect - https://openid.net/connect/ - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
+// TODO - indieAuth - https://indieauth.spec.indieweb.org/
+// TODO - UMA2 - https://docs.kantarainitiative.org/uma/wg/rec-oauth-uma-grant-2.0.html
+
+// TODO - https://datatracker.ietf.org/doc/html/rfc7591
+// TODO - https://datatracker.ietf.org/doc/html/rfc7592
 
 // TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
 //      - https://duckduckgo.com/?t=ffab&q=OAuth-HTTP-MAC&ia=web
 
-// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
-
 // TODO - Device identification - https://datatracker.ietf.org/doc/html/rfc6819#section-5.2.2.5
 // TODO - device endpoint - https://datatracker.ietf.org/doc/html/rfc8628#section-5.1
 
-// TODO - Add more functions such as revokeTokenForClient, revokeAllTokensForClient, revokeTokenForUser, revokeAllTokensForUser etc.
-// TODO - Also add functions like generateClient(name, image_ur, etc): (id, secret), revokeClient (and obviously all its tokens) etc.
-
-// TODO - Add option deleteAfterUse. This option if set to true, access tokens can only be used once and deleted immediately after use (when passing authenticate and/or introspection functions they will be deleted)
-//      - Be careful here, when the token is used twice at the same time (maybe add a delay before asking database?).
-
-// TODO - Add refresh token refresh count, can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
+// TODO - Add access/refresh token refresh count, can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
 
 // TODO - Add notBefore in options for jwt. It will be fixed value like accessTokenLifetime.
 // TODO - Maybe add a function to determinate the lifetime & notBefore of tokens (access & refresh).
-// TODO - Add endpoint function for the front-end to check all the data (for example if client_id (careful on abuse to find if client ids exists) is valid, or scopes ae valid, etc.)
 // TODO - getClientCredentials add 'auto'. It will detect automatically where the creds are based on flow and endpoint.
 
 export class AuthorizationServer {
@@ -118,15 +105,18 @@ export class AuthorizationServer {
             opts.getUser = (req) => req.user;
 
         if (opts.audience === undefined)
-            opts.audience = opts.issuer;
+            opts.audience = opts.baseUrl;
+
+        if (opts.deleteAfterUse === undefined)
+            opts.deleteAfterUse = false
 
         if (opts.allowAuthorizeMethodPOST === undefined)
             opts.allowAuthorizeMethodPOST = false;
 
-        if(opts.issueRefreshTokenForThisClient === undefined)
+        if (opts.issueRefreshTokenForThisClient === undefined)
             opts.issueRefreshTokenForThisClient = (client_id, req) => true;
 
-        ['validateClient', 'validateRedirectURI', 'validateScopes', 'secret', 'issuer', 'saveTokens', 'getAccessToken', 'getRefreshToken']
+        ['validateClient', 'validateRedirectURI', 'validateScopes', 'secret', 'baseUrl', 'saveTokens', 'getAccessToken', 'getRefreshToken']
             .forEach(field => {
                 if ((opts as any)[field] === undefined) throw new Error(`AuthorizationServerException Field ${field} cannot be undefined`);
             });
@@ -255,7 +245,7 @@ export class AuthorizationServer {
             // Validate scopes
             let scopes: string[] = scope?.split(options.scopeDelimiter) || [];
             const scopeResult = await options.validateScopes(scopes, req);
-            if(Array.isArray(scopeResult))
+            if (Array.isArray(scopeResult))
                 scopes = scopeResult;
             else if (scopeResult === false) {
                 this.eventEmitter.emit(Events.INVALID_SCOPES, req);
@@ -310,7 +300,7 @@ export class AuthorizationServer {
 
             // Issue refresh token
             let issueRefreshToken = this.issueRefreshToken;
-            if(issueRefreshToken)
+            if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
             // Call implementation function
@@ -341,7 +331,7 @@ export class AuthorizationServer {
      */
     public token(overrideOptions?: Partial<AuthorizationServerOptions>): ExpressMiddleware {
         const options = Object.assign({}, this.options, overrideOptions || {});
-        return this.clientEndpoint(options, 'token');
+        return this.postEndpoint(options, 'token');
     }
 
     /**
@@ -349,7 +339,7 @@ export class AuthorizationServer {
      */
     public deviceAuthorization(overrideOptions?: Partial<AuthorizationServerOptions>): ExpressMiddleware {
         const options = Object.assign({}, this.options, overrideOptions || {});
-        return this.clientEndpoint(options, 'device_authorization');
+        return this.postEndpoint(options, 'device_authorization');
     }
 
     /**
@@ -380,7 +370,7 @@ export class AuthorizationServer {
             const {token, token_type_hint} = req.body;
             if (!token) return inactive(res);
 
-            let payload: any = verifyToken(token, options.secret, undefined, options.issuer);
+            let payload: any = verifyToken(token, options.secret, undefined, options.baseUrl);
             if (!payload) return inactive(res);
 
             if (payload.type !== 'access_token')
@@ -394,6 +384,19 @@ export class AuthorizationServer {
 
             if (!dbToken || dbToken !== token)
                 return inactive(res);
+
+            // Delete token if deleteAfterUse is `true`
+            if (options.deleteAfterUse) {
+                const deleted = await options.revoke({
+                    what: 'access_token',
+                    user: payload.user,
+                    clientId: payload.client_id,
+                    accessToken: token
+                }, req)
+
+                if (!deleted)
+                    return inactive(res);
+            }
 
             res.status(200).json({
                 active: true,
@@ -438,7 +441,7 @@ export class AuthorizationServer {
 
             // Verify if the token sent was issued by us.
             // Audience is not needed, because we revoke a token that we have issued.
-            let payload: any = verifyToken(token, options.secret, undefined, options.issuer);
+            let payload: any = verifyToken(token, options.secret, undefined, options.baseUrl);
             if (!payload) return res.status(200).end(null);
 
             // Verify token payload
@@ -513,7 +516,7 @@ export class AuthorizationServer {
                 });
             }
 
-            let payload: any = verifyToken(token, options.secret, options.issuer, options.issuer);
+            let payload: any = verifyToken(token, options.secret, options.baseUrl, options.baseUrl);
             if (!payload) {
                 this.eventEmitter.emit(Events.AUTHENTICATION_INVALID_TOKEN_JWT, req);
                 return error(res, {
@@ -536,12 +539,14 @@ export class AuthorizationServer {
                 });
             }
 
+            // Request token
             let dbToken = await options.getAccessToken({
                 accessToken: token,
                 clientId: payload.client_id,
                 user: payload.user
             }, req);
 
+            // Validate token from db
             if (!dbToken || dbToken !== token) {
                 this.eventEmitter.emit(Events.AUTHENTICATION_INVALID_TOKEN_DB, req);
                 return error(res, {
@@ -551,6 +556,27 @@ export class AuthorizationServer {
                     status: 401,
                     noCache: false
                 });
+            }
+
+            // Delete token if deleteAfterUse is `true`
+            if (options.deleteAfterUse) {
+                const deleted = await options.revoke({
+                    what: 'access_token',
+                    user: payload.user,
+                    clientId: payload.client_id,
+                    accessToken: token
+                }, req)
+
+                if (!deleted) {
+                    this.eventEmitter.emit(Events.AUTHENTICATION_INVALID_TOKEN_DB, req);
+                    return error(res, {
+                        error: 'invalid_token',
+                        error_description: 'The access token has expired',
+                        error_uri: options.errorUri,
+                        status: 401,
+                        noCache: false
+                    });
+                }
             }
 
             if (scopes) {
@@ -582,7 +608,68 @@ export class AuthorizationServer {
         };
     }
 
-    private clientEndpoint(options: Required<AuthorizationServerOptions>, endpoint: string): ExpressMiddleware {
+    /**
+     * The metadata function.
+     */
+    public metadata(): ExpressMiddleware {
+        const data = this.options.metadata;
+        if (!data) throw new Error('AuthorizationServerException metadata was notdefined in options.')
+
+        const authorizationTypes = this.flows.filter(flow => flow.endpoint === 'authorize').map(flow => flow.matchType);
+        const tokenTypes = this.flows.filter(flow => flow.endpoint === 'token').map(flow => flow.matchType);
+
+        if (authorizationTypes.length > 0 && !data.authorizationPath)
+            throw new Error('AuthorizationServerException Authorization endpoint is missing');
+
+        if (tokenTypes.length > 0 && !data.tokenPath)
+            throw new Error('AuthorizationServerException Token endpoint is missing');
+
+        let metadata: Partial<Metadata> = {
+            // Flows
+            response_types_supported: authorizationTypes,
+            grant_types_supported: tokenTypes.length > 0 ? tokenTypes : ['authorization_code', 'implicit'],
+
+            // Endpoints
+            authorization_endpoint: resolveUrl(this.options.baseUrl, data.authorizationPath!),
+            token_endpoint: resolveUrl(this.options.baseUrl, data.tokenPath!),
+            registration_endpoint: data.registrationPath ? resolveUrl(this.options.baseUrl, data.registrationPath) : undefined,
+            revocation_endpoint: data.revocationPath ? resolveUrl(this.options.baseUrl, data.revocationPath) : undefined,
+            introspection_endpoint: data.introspectionPath ? resolveUrl(this.options.baseUrl, data.introspectionPath) : undefined,
+            device_authorization_endpoint: data.deviceAuthorizationPath ? resolveUrl(this.options.baseUrl, data.deviceAuthorizationPath) : undefined,
+
+            // Other
+            issuer: this.options.baseUrl,
+            ui_locales_supported: data.ui_locales_supported,
+
+            jwks_uri: data.jwksUri,
+            scopes_supported: data.scopes_supported ?? [],
+            response_modes_supported: data.response_modes_supported ?? ['query', 'fragment'],
+            token_endpoint_auth_methods_supported: data.token_endpoint_auth_methods_supported ?? ['client_secret_basic'],
+            token_endpoint_auth_signing_alg_values_supported: data.token_endpoint_auth_signing_alg_values_supported,
+            service_documentation: data.serviceDocumentation,
+            op_policy_uri: data.op_policy_uri,
+            op_tos_uri: data.op_tos_uri,
+            revocation_endpoint_auth_methods_supported: data.revocation_endpoint_auth_methods_supported ?? ['client_secret_basic'],
+            revocation_endpoint_auth_signing_alg_values_supported: data.revocation_endpoint_auth_signing_alg_values_supported,
+            introspection_endpoint_auth_signing_alg_values_supported: data.introspection_endpoint_auth_signing_alg_values_supported,
+            introspection_endpoint_auth_methods_supported: data.introspection_endpoint_auth_methods_supported,
+            code_challenge_methods_supported: data.code_challenge_methods_supported,
+        };
+
+        metadata.signed_metadata = signToken({
+            payload: {
+                ...metadata,
+                issuer: undefined
+            },
+            secret: this.options.secret,
+            issuer: this.options.baseUrl,
+            audience: undefined
+        });
+
+        return (req, res, next) => res.status(200).json(metadata);
+    }
+
+    private postEndpoint(options: Required<AuthorizationServerOptions>, endpoint: string): ExpressMiddleware {
         return async (req, res, next) => {
             if (req.method !== 'POST') {
                 res.status(405).end('Method not allowed.');
@@ -634,7 +721,7 @@ export class AuthorizationServer {
 
             // Issue refresh token
             let issueRefreshToken = this.issueRefreshToken;
-            if(issueRefreshToken)
+            if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
             flow.function({

@@ -228,6 +228,9 @@ Called from the
 function when the
 [`getAccessToken`](./authorization_server.md#getaccesstoken)
 option did not return the expected access token (possibly revoked)
+or the
+[`revoke`](./authorization_server.md#revoke)
+option did not return `true`.
 
 ### `AUTHENTICATION_INVALID_TOKEN_SCOPES`
 Called from the

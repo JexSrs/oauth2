@@ -100,7 +100,7 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                 // in case the app sends the code even if it has expired.
                 const oldBucket = await options.getBucket(device_code, data.req);
                 if (oldBucket != null) {
-                    const payload = verifyToken(oldBucket, data.serverOpts.secret, data.serverOpts.issuer, data.serverOpts.issuer);
+                    const payload = verifyToken(oldBucket, data.serverOpts.secret, data.serverOpts.baseUrl, data.serverOpts.baseUrl);
                     if (payload != null) {
                         eventEmitter.emit(Events.SLOW_DOWN, data.req);
                         return callback(undefined, {error: 'slow_down', status: 400, error_uri: undefined});
@@ -115,8 +115,8 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                     },
                     secret: data.serverOpts.secret,
                     expiresIn: options.interval,
-                    issuer: data.serverOpts.issuer,
-                    audience: data.serverOpts.issuer
+                    issuer: data.serverOpts.baseUrl,
+                    audience: data.serverOpts.baseUrl
                 });
                 await options.saveBucket(device_code, bucket, options.interval!, data.req);
 

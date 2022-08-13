@@ -1,6 +1,12 @@
 import {PlusUN, RevocationAsk, THAccessTokenAsk, THRefreshTokenAsk, THTokenSave} from "./types.js";
+import {MetadataOptions} from "./metadataTypes.js";
 
 export type AuthorizationServerOptions = {
+    /**
+     * Used by the `metadata` function to inquire a set of information about
+     * the authorization server.
+     */
+    metadata?: MetadataOptions;
     /**
      * Used by the `authenticate` function to inquire about the
      * location of the access token. It defaults to the authorization header.
@@ -156,6 +162,12 @@ export type AuthorizationServerOptions = {
         | ((client_id: any, scopes: string[], req: any) => string)
         | ((client_id: any, scopes: string[], req: any) => Promise<string>);
     /**
+     * Used by the `introspection`, `authenticate`
+     * functions to inquire if an access token should be deleted after it is used.
+     * It defaults to `false`.
+     */
+    deleteAfterUse?: boolean;
+    /**
      * Used by the `authorize` function to check if the authorization endpoint can be called
      * from the `POST` method (aside the `GET` method). It defaults to `false`.
      */
@@ -231,12 +243,10 @@ export type AuthorizationServerOptions = {
      */
     secret: string;
     /**
-     * The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
-     * At JWT, `issuer` is the party that created the token and signed it with its private key
-     * (`secret`). In this case the `AuthorizationServer` is the one who issues the tokens.
-     * In most cases the `issuer` option is the `AuthorizationServer`'s HTTPS base URL.
+     * The base URL of your authorization server. It will be used as the issuer in all generated
+     * tokens and will be appended to the metadata endpoints.
      */
-    issuer: string;
+    baseUrl: string;
     /**
      * Used by all the flows to save the generated tokens to the database.
      * It should always return `true` unless the database did not save the tokens,
@@ -276,9 +286,9 @@ export type AuthorizationServerOptions = {
     getRefreshToken: ((data: THRefreshTokenAsk, req: any) => PlusUN<string>)
         | ((data: THRefreshTokenAsk, req: any) => Promise<PlusUN<string>>);
     /**
-     * Used by the `revocation` function and `Refresh Token`
+     * Used by the `revocation`, `authenticate`, `introspection` functions and `Refresh Token`
      * flow to ask for the revocation of a token or a record.
-     * It should always return `true` unless the database did not delete the tokens or record, in that
+     * It must always return `true` unless the database did not delete the tokens or record, in that
      * case you must return `false`.
      *
      * This function also supports async calls.

@@ -189,7 +189,7 @@ This field is used by all the flows and endpoints and can be overridden from the
 
 ### `audience`
 Used by all the flows and to inquire about where the generated tokens are meant to be used.
-It defaults to `issuer`, which specifies that is meant to be used only to authorization server.
+It defaults to `baseUrl`, which specifies that is meant to be used only to authorization server.
 
 This option also supports asynchronous calls.
 
@@ -202,6 +202,13 @@ audience: (client_id, req) => {
     return "audience";
 }
 ```
+
+### `deleteAfterUse`
+Used by the
+[`introspection`](functions_and_endpoints.md#introspection),
+[`authenticate`](functions_and_endpoints.md#authenticate)
+functions to inquire if an access token should be deleted after it is used.
+It defaults to `false`.
 
 ### `allowAuthorizeMethodPOST`
 Used by the
@@ -326,11 +333,13 @@ Take note that:
 * If you want to change the `secret` keep in mind that all the tokens generated prio this change
 will no longer be valid.
 
-### `issuer`
-The `AuthorizationServer` uses JsonWebToken (JWT) for generating any kind of tokens.
-At JWT, `issuer` is the party that created the token and signed it with its private key
-([`secret`](#secret)). In this case the `AuthorizationServer` is the one who issues the tokens.
-In most cases the `issuer` option is the `AuthorizationServer`'s HTTPS base URL.
+### `baseUrl`
+The base URL of your authorization server. It will be used as the issuer in all generated
+tokens and will be appended to the metadata endpoints.
+
+Notes:
+* It is required to be HTTPS. Only if the base URL is localhost it will allow HTTP.
+* The URL must end with `/`.
 
 ### `saveTokens`
 Used by all the flows to save the generated tokens to the database.
@@ -374,11 +383,13 @@ getRefreshToken: (data, req) => db.findTokens(data)?.refreshToken;
 
 ### `revoke`
 Used by the
-[`revocation`](functions_and_endpoints.md#revocation)
-function and
+[`revocation`](functions_and_endpoints.md#revocation),
+[`authenticate`](functions_and_endpoints.md#authenticate),
+[`introspection`](functions_and_endpoints.md#introspection)
+functions and
 [`Refresh Token`](../flows/refresh_token.md)
 flow to ask for the revocation of a token or a record.
-It should always return `true` unless the database did not delete the tokens or record, in that
+It must always return `true` unless the database did not delete the tokens or record, in that
 case you must return `false`.
 
 This function also supports async calls.
@@ -393,3 +404,8 @@ revoke: (data, req) => {
         return db.deleteAllTokens(data.refreshToken);
 }
 ```
+
+### `metadata`
+Used by the
+[`metadata`](functions_and_endpoints.md#metadata)
+function to inquire a set of information about the authorization server.

@@ -8,9 +8,14 @@ export function signToken(data: {
     payload: object;
     secret: string;
     expiresIn?: number,
-    audience: string;
+    audience?: string;
     issuer: string;
 }): string {
+    for(const key in data.payload) {
+        if((<any>data.payload)[key] === undefined)
+            delete (<any>data.payload)[key]
+    }
+
     return jwt.sign(data.payload, data.secret, {
         // algorithm: 'RS256',
         // header: {
@@ -74,7 +79,7 @@ export async function generateARTokens(data: {
         secret: data.opts.secret,
         expiresIn: data.opts.accessTokenLifetime ?? undefined,
         audience,
-        issuer: data.opts.issuer
+        issuer: data.opts.baseUrl
     });
     let refreshToken: string | undefined;
 
@@ -90,7 +95,7 @@ export async function generateARTokens(data: {
             secret: data.opts.secret,
             expiresIn: data.opts.refreshTokenLifetime ?? undefined,
             audience,
-            issuer: data.opts.issuer
+            issuer: data.opts.baseUrl
         });
 
     let result: any = {

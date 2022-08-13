@@ -96,3 +96,14 @@ export function isRedirectUriExactMatch(original: string, fromClient: any): bool
     // Check if both urls are localhost
     return typeof fromClient === 'string' && isLocalhost(fromClient);
 }
+
+export function resolveUrl(baseUrl: string, endpoint: string): string {
+    if((baseUrl.endsWith('/') && !endpoint.startsWith('/'))
+        || (!baseUrl.endsWith('/') && endpoint.startsWith('/')))
+        return baseUrl + endpoint;
+
+    if(baseUrl.endsWith('/') && endpoint.startsWith('/'))
+        return `${baseUrl}${endpoint.substring(1)}`;
+
+    return `${baseUrl}/${endpoint}`;
+}

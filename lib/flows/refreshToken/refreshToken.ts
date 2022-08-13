@@ -21,7 +21,7 @@ export function refreshToken(opts?: RefreshTokenOptions): Flow {
                 });
 
             // Verify refresh token
-            let refreshTokenPayload: any = verifyToken(refresh_token, data.serverOpts.secret, data.serverOpts.issuer, data.serverOpts.issuer);
+            let refreshTokenPayload: any = verifyToken(refresh_token, data.serverOpts.secret, data.serverOpts.baseUrl, data.serverOpts.baseUrl);
             if (!refreshTokenPayload) {
                 eventEmitter.emit(Events.INVALID_REFRESH_TOKEN_JWT, data.req);
                 return callback(undefined, {

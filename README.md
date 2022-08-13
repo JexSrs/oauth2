@@ -3,11 +3,13 @@
 ## Table of contents
 * [Introduction & Specifications](#introduction--specifications)
   * [Notes](#notes)
+  * [Request a feature](#request-a-feature)
 * [Installation](#installation)
 * [Authorization server](#authorization-server)
   * [Flows](#flows)
   * [Events](#events)
   * [Functions & Endpoints](#functions--endpoints)
+  * [Metadata](#metadata)
   * [State](#state)
 * [Resource server](#resource-server)
 * [Security considerations](#security-considerations)
@@ -28,9 +30,9 @@ You can see with more detail the specs that was used below:
 * [RFC7636](https://datatracker.ietf.org/doc/html/rfc7636): PKCE Extension
 * [RFC7662](https://datatracker.ietf.org/doc/html/rfc7662): Token Introspection
 * [RFC8252](https://datatracker.ietf.org/doc/html/rfc8252): OAuth 2.0 for Native Apps
+* [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414): OAuth 2.0 Authorization Server Metadata
 * [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628): Device Authorization Grant
 * [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068): JWT Profile for OAuth 2.0 Access Tokens
-* [RFC9101](https://datatracker.ietf.org/doc/html/rfc9101): JWT-Secured Authorization Request
 * [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics)
 
 ### Notes
@@ -41,6 +43,12 @@ with the claim's (`sub`) type which is string. It will be replaced inside the pa
   * The parameter `resource` will not be used, instead the Authorization Server
 should decide the `audience` claim using the [`audience`](./docs/authorizationServer#audience)
 option.
+
+### Request a feature
+`oauth2` library tries to implement most of the features of OAuth2 and its extensions.
+If you want to request a new feature (e.x. implementing a new flow) or report a bug
+you can always open a new issue. In case it is related to OAuth2 spec or it's extensions
+you `must` include the related spec.
 
 ## Installation
 This library is not in [npm](https://www.npmjs.com/). To use it you have to clone the repository to
@@ -126,6 +134,11 @@ These functions are:
 * `authenticate`: A way to authenticate access tokens (if authorization and resource server are the same).
 
 Click [here](docs/authorizationServer/functions_and_endpoints.md) for more details about functions and endpoints.
+
+### Metadata
+
+[//]: # (TODO)
+https://datatracker.ietf.org/doc/html/rfc8414#section-3.3
 
 ### State
 If you have read all the documentation so far I am sure you have noticed how all options that provide

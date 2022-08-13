@@ -78,8 +78,8 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                     payload,
                     secret: data.serverOpts.secret,
                     expiresIn: options.authorizationCodeLifetime,
-                    issuer: data.serverOpts.issuer,
-                    audience: data.serverOpts.issuer
+                    issuer: data.serverOpts.baseUrl,
+                    audience: data.serverOpts.baseUrl
                 });
 
                 // Save authorization code to database
@@ -134,7 +134,7 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                     });
 
                 // Token verification
-                let authCodePayload: any = verifyToken(code, data.serverOpts.secret, data.serverOpts.issuer, data.serverOpts.issuer);
+                let authCodePayload: any = verifyToken(code, data.serverOpts.secret, data.serverOpts.baseUrl, data.serverOpts.baseUrl);
                 if (!authCodePayload) {
                     eventEmitter.emit(Events.INVALID_AUTHORIZATION_CODE_TOKEN_JWT, data.req);
                     return callback(undefined, {
