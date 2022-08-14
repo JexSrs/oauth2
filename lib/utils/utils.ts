@@ -107,3 +107,10 @@ export function resolveUrl(baseUrl: string, endpoint: string): string {
 
     return `${baseUrl}/${endpoint}`;
 }
+
+export async function passToNext<T, E>(processes: E[], first: T, call: (proc: E, value: T) => Promise<T>): Promise<T> {
+    let response = first;
+    for (const proc of processes)
+        response = await call(proc, response);
+    return response;
+}

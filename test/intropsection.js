@@ -15,25 +15,25 @@ let resServer = new ResourceServer({
     }
 });
 
-const clientExpress = express();
-clientExpress.get('/protected', resServer.authenticate(), function (req, res) {
+const rsExpress = express();
+rsExpress.get('/protected', resServer.authenticate(), function (req, res) {
     res.status(200).end('protected-content');
 });
-clientExpress.get('/protected1', resServer.authenticate('scope1'), function (req, res) {
+rsExpress.get('/protected1', resServer.authenticate('scope1'), function (req, res) {
     res.status(200).end('protected-content');
 });
-clientExpress.get('/protected2', resServer.authenticate('scope2'), function (req, res) {
+rsExpress.get('/protected2', resServer.authenticate('scope2'), function (req, res) {
     res.status(200).end('protected-content');
 });
-clientExpress.get('/protected3', resServer.authenticate(['scope1', 'scope2'], 'all'), function (req, res) {
+rsExpress.get('/protected3', resServer.authenticate(['scope1', 'scope2'], 'all'), function (req, res) {
     res.status(200).end('protected-content');
 });
-clientExpress.get('/protected4', resServer.authenticate(['scope1', 'scope2'], 'some'), function (req, res) {
+rsExpress.get('/protected4', resServer.authenticate(['scope1', 'scope2'], 'some'), function (req, res) {
     res.status(200).end('protected-content');
 });
 
-const server = clientExpress.listen(DATA.CLIENT_INTROSPECTION_PORT, () => {
-    console.log('Resource server listening at', DATA.CLIENT_INTROSPECTION_PORT);
+const server = rsExpress.listen(DATA.CLIENT_RS_PORT, () => {
+    console.log('Resource server listening at', DATA.CLIENT_RS_PORT);
 });
 
 setTimeout(server.close.bind(server), 60 * 1000);
@@ -65,7 +65,7 @@ describe("Introspection", function () {
     });
 
     it('No scope', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -77,7 +77,7 @@ describe("Introspection", function () {
     });
 
     it('Valid scope (scope1)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected1', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected1', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             }
@@ -88,7 +88,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid scope (scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected2', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected2', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -100,7 +100,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid scope (scope1 && scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected3', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected3', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -112,7 +112,7 @@ describe("Introspection", function () {
     });
 
     it('Valid scope (scope1 || scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected4', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected4', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -137,7 +137,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid tokens / No scope', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -149,7 +149,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid tokens / Valid scope (scope1)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected1', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected1', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -161,7 +161,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid tokens / Invalid scope (scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected2', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected2', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -173,7 +173,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid tokens / Invalid scope (scope1 && scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected3', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected3', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },
@@ -185,7 +185,7 @@ describe("Introspection", function () {
     });
 
     it('Invalid tokens / Valid scope (scope1 || scope2)', () => {
-        return axios.get(DATA.CLIENT_INTROSPECTION_URL + '/protected4', {
+        return axios.get(DATA.CLIENT_RS_URL + '/protected4', {
             headers: {
                 Authorization: `Bearer ${tokens.access_token}`
             },

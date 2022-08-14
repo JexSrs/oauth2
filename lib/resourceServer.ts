@@ -63,13 +63,6 @@ export class ResourceServer {
         //      - Verify JWT => if it fails respond with failed message.
         //      - If introspectionURL is defined ask introspectionURL => if it fails respond with failed message
         //      - Proceed with request (next())
-        if(options.introspectionURL)
-            return this.authenticateOnline(scope, cond);
-        else return this.authenticateOffline(scope, cond);
-    }
-
-    public authenticateOnline(scope?: string | string[], cond?: 'all' | 'some'): ExpressMiddleware {
-        const options = Object.assign(this.options, {});
 
         let scopes: string[] | undefined = Array.isArray(scope) ? scope : (scope ? [scope] : undefined);
         let condition = cond || 'all';
@@ -84,6 +77,7 @@ export class ResourceServer {
                 headers: <any>options.headers
             }).then(response => {
                 const data = response.data;
+                console.log(data)
 
                 if(data.active === false)
                     return error(res, {
@@ -134,6 +128,7 @@ export class ResourceServer {
                 })
             });
         };
+
     }
 
     public authenticateOffline(scope?: string | string[], cond?: 'all' | 'some'): ExpressMiddleware {

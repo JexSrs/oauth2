@@ -175,7 +175,8 @@ export type AuthorizationServerOptions = {
     /**
      * Used by the `authorize`, `token`, `deviceAuthorization`
      * functions to inquire if a refresh token will be generated for this client.
-     * It defaults tp `true` for all clients.
+     * It will not generate a refresh token if the `Refresh Token` flow is not used.
+     * It defaults to `true` for all clients.
      *
      * This option also supports asynchronous calls.
      */

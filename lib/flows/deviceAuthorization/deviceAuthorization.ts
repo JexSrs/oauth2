@@ -27,7 +27,7 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
             name: 'device-authorization',
             endpoint: 'device_authorization',
             matchType: 'token',
-            function: async (data, callback, eventEmitter) => {
+            function: async (data, eventEmitter) => {
                 const {scope} = data.req.body;
 
                 // Validate scopes
@@ -37,11 +37,11 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                     scopes = scopeResult;
                 else if (scopeResult === false) {
                     eventEmitter.emit(Events.INVALID_SCOPES, data.req);
-                    return callback(undefined, {
+                    return {
                         error: 'invalid_scope',
                         error_description: 'One or more scopes are not acceptable',
                         error_uri: options.errorUri
-                    });
+                    };
                 }
 
                 let deviceCode = await options.deviceCodeGenerator!(data.clientId, data.req);
@@ -59,11 +59,11 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
 
                 if (!dbRes) {
                     eventEmitter.emit(Events.FAILED_DEVICE_CODE_SAVE, data.req);
-                    return callback(undefined, {
+                    return {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error',
                         error_uri: options.errorUri
-                    });
+                    };
                 }
 
                 const response: any = {
@@ -78,22 +78,22 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                     response.verification_uri_complete = options.verificationURIComplete
                         .replace('{user-code}', userCode);
 
-                callback(response);
+                return response;
             }
         },
         {
             name: 'device-authorization',
             endpoint: 'token',
             matchType: 'urn:ietf:params:oauth:grant-type:device_code',
-            function: async (data, callback, eventEmitter) => {
+            function: async (data, eventEmitter) => {
                 let {device_code} = data.req.body;
 
                 if (!device_code)
-                    return callback(undefined, {
+                    return {
                         error: 'invalid_request',
                         error_description: 'Body parameter device_code is missing',
                         error_uri: options.errorUri
-                    });
+                    };
 
                 // Rate limit using deviceCode
                 // We are using jwt tokens to make sure that the bucket is expired,
@@ -103,7 +103,11 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                     const payload = verifyToken(oldBucket, data.serverOpts.secret, data.serverOpts.baseUrl, data.serverOpts.baseUrl);
                     if (payload != null) {
                         eventEmitter.emit(Events.SLOW_DOWN, data.req);
-                        return callback(undefined, {error: 'slow_down', status: 400, error_uri: undefined});
+                        return {
+                            error: 'slow_down',
+                            status: 400,
+                            error_uri: options.errorUri
+                        };
                     }
                 }
 
@@ -128,29 +132,41 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
 
                 if (!dbDev || (dbDev.status !== 'pending' && dbDev.status !== 'completed')) {
                     eventEmitter.emit(Events.INVALID_DEVICE_CODE, data.req);
-                    return callback(undefined, {
+                    return {
                         error: 'invalid_grant',
                         error_description: 'Device code not found',
                         error_uri: options.errorUri,
                         status: 400
-                    });
+                    };
                 }
 
                 if (dbDev.expiresAt <= Math.trunc(Date.now() / 1000)) {
                     eventEmitter.emit(Events.EXPIRED_DEVICE_CODE, data.req);
-                    return callback(undefined, {error: 'expired_token', status: 400});
+                    return {
+                        error: 'expired_token',
+                        status: 400,
+                        error_uri: options.errorUri
+                    };
                 }
 
                 if (dbDev.status === 'pending') {
                     eventEmitter.emit(Events.REQUEST_PENDING, data.req);
-                    return callback(undefined, {error: 'authorization_pending', status: 400, error_uri: undefined});
+                    return {
+                        error: 'authorization_pending',
+                        status: 400,
+                        error_uri: options.errorUri
+                    };
                 }
 
                 // Request completed - Get user if authorized
                 let user = await options.getUser(dbDev.deviceCode, dbDev.userCode, data.req);
                 if (user == null) {
                     eventEmitter.emit(Events.ACCESS_DENIED, data.req);
-                    return callback(undefined, {error: 'access_denied', status: 400});
+                    return {
+                        error: 'access_denied',
+                        status: 400,
+                        error_uri: options.errorUri
+                    };
                 }
 
                 await options.removeDevice({
@@ -183,14 +199,14 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
 
                 if (!dbRes) {
                     eventEmitter.emit(Events.FAILED_TOKEN_SAVE, data.req);
-                    return callback(undefined, {
+                    return {
                         error: 'server_error',
                         error_description: 'Encountered an unexpected error',
                         error_uri: options.errorUri
-                    });
+                    };
                 }
 
-                callback(tokens);
+                return tokens;
             }
         }
     ];

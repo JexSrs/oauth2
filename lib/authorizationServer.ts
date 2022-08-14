@@ -1,5 +1,5 @@
-import {ExpressMiddleware, RevocationAsk} from "./components/types";
-import {buildQuery, error, isRedirectUriExactMatch, resolveUrl} from "./utils/utils";
+import {ARTokens, ExpressMiddleware, RevocationAsk} from "./components/types";
+import {buildQuery, error, isRedirectUriExactMatch, passToNext, resolveUrl} from "./utils/utils";
 import {validateUserAgent} from "./utils/useragent";
 import {signToken, verifyToken} from './utils/tokenUtils'
 import {Flow} from "./components/flow";
@@ -7,6 +7,8 @@ import {AuthorizationServerOptions} from "./components/authorizationServerOption
 import EventEmitter from "events";
 import {Events} from "./components/events";
 import {Metadata} from "./components/metadataTypes.js";
+import {Interceptor} from "./components/interceptor.js";
+import {decode} from "jsonwebtoken";
 
 
 // Will not be implemented (under discussion)
@@ -38,10 +40,16 @@ import {Metadata} from "./components/metadataTypes.js";
 // TODO - device endpoint - https://datatracker.ietf.org/doc/html/rfc8628#section-5.1
 
 // TODO - Add access/refresh token refresh count, can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
+//      - This can replace the deleteAfterUse by setting the access token count at `1`.
 
 // TODO - Add notBefore in options for jwt. It will be fixed value like accessTokenLifetime.
 // TODO - Maybe add a function to determinate the lifetime & notBefore of tokens (access & refresh).
-// TODO - getClientCredentials add 'auto'. It will detect automatically where the creds are based on flow and endpoint.
+
+// TODO - Add jwt subject as JSON.stringify(user)
+
+// TODO - Find a way for flows to call interceptors, but be careful not the interceptor to be called twice.
+//      - this will be useful not writing openIdConnect code twice, once for response_type=id_token and once
+//      - when the token is generated at the authorization_code flow
 
 export class AuthorizationServer {
 
@@ -52,6 +60,7 @@ export class AuthorizationServer {
     private readonly options: Required<AuthorizationServerOptions>;
     private issueRefreshToken: boolean = false;
     private readonly flows: Flow[] = [];
+    private readonly interceptors: Interceptor[] = [];
 
     /**
      * Construct a new AuthorizationServer to handle your oauth2 requests.
@@ -126,9 +135,9 @@ export class AuthorizationServer {
 
     /**
      * Register a new flow.
-     * @param flow You can provide more than one implementation in the same time.
+     * @param flow
      */
-    public use(flow: Flow | Flow[]): AuthorizationServer {
+    public use(flow: Flow | Flow[]): this {
         let flows = Array.isArray(flow) ? flow : [flow];
         flows.forEach(fl => {
             if (!fl.name) throw new Error('Flow name is missing');
@@ -136,7 +145,7 @@ export class AuthorizationServer {
                 throw new Error(`Flow ${fl.name} has invalid endpoint`);
 
             if (fl.matchType.trim().length === 0)
-                console.log(`Flow ${fl.name} has empty match type which is not recommended`);
+                throw new Error(`Flow ${fl.name} has empty match type which is not allowed`);
 
             // Match type duplication check for each endpoint
             let i;
@@ -156,11 +165,36 @@ export class AuthorizationServer {
     }
 
     /**
+     * Register a new interceptor.
+     * @param interceptor
+     */
+    public intercept(interceptor: Interceptor | Interceptor[]): this {
+        let inters = Array.isArray(interceptor) ? interceptor : [interceptor];
+        inters.forEach(it => {
+            if (!it.name) throw new Error('Interceptor name is missing');
+            if (!['authorize', 'token', 'device_authorization'].includes(it.endpoint))
+                throw new Error(`Interceptor ${it.name} has invalid endpoint`);
+
+            if (!(it as any).matchType && !(it as any).matchScope)
+                throw new Error(`Interceptor ${it.name} has empty matchType and matchScope which is not allowed`);
+
+            // ... Interceptors can share the same matchTypes
+
+            if (typeof it.function !== 'function')
+                throw new Error(`Interceptor ${it.name} has invalid function`);
+
+            this.interceptors.push(it)
+        });
+
+        return this;
+    }
+
+    /**
      * Register a new listener for an event.
      * @param event
      * @param listener
      */
-    public on(event: string, listener: (...args: any[]) => void): AuthorizationServer {
+    public on(event: string, listener: (...args: any[]) => void): this {
         this.eventEmitter.on(event, listener);
         return this;
     }
@@ -190,19 +224,19 @@ export class AuthorizationServer {
             if (!client_id)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Query parameter client_id is missing',
+                    error_description: 'Parameter client_id is missing',
                 });
 
             if (!redirect_uri)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Query parameter redirect_uri is missing'
+                    error_description: 'Parameter redirect_uri is missing'
                 });
 
             if (!response_type)
                 return error(res, {
                     error: 'invalid_request',
-                    error_description: 'Query parameter response_type is missing'
+                    error_description: 'Parameter response_type is missing'
                 });
 
             // Validate client_id and redirect_uri
@@ -271,11 +305,10 @@ export class AuthorizationServer {
                 });
             }
 
-            // TODO - to support openid, first split response_type with space and then check
-            //      - id token will be generated here and be included in the response from here.
+            const rTypes = response_type.split(' ');
 
             // Find flow
-            let flow = this.flows.find(imp => imp.endpoint === 'authorize' && imp.matchType === response_type);
+            const flow = this.flows.find(imp => imp.endpoint === 'authorize' && rTypes.includes(imp.matchType));
             if (!flow) {
                 this.eventEmitter.emit(Events.UNSUPPORTED_RESPONSE_TYPE, req);
                 return error(res, {
@@ -303,26 +336,42 @@ export class AuthorizationServer {
             if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
+            // Find interceptor
+            const typeInterceptors = this.interceptors.filter(it => it.endpoint === 'authorize' && rTypes.includes(it.matchType));
+
             // Call implementation function
-            flow.function({
+            const responseOrError = await flow.function({
                 req,
                 serverOpts: options,
                 scopes, user,
                 issueRefreshToken,
                 clientId: client_id
-            }, (response, err) => {
-                if (err)
-                    return error(res, {
-                        error: err.error,
-                        error_description: err.error_description,
-                        error_uri: err.error_uri ?? options.errorUri,
-                        redirect_uri,
-                        state
-                    });
-
-                const url = `${redirect_uri}?${buildQuery({...response, state})}`;
-                res.header('Cache-Control', 'no-store').status(302).redirect(url);
             }, this.eventEmitter);
+
+            if ((responseOrError as any).error)
+                return error(res, {
+                    error: (<any>responseOrError).error,
+                    error_description: (<any>responseOrError).error_description,
+                    error_uri: (<any>responseOrError).error_uri ?? options.errorUri,
+                    redirect_uri,
+                    state
+                });
+
+            let response: {[key: string]: string | number} = <any>responseOrError;
+
+            // Call interceptors
+            response = await passToNext(typeInterceptors,
+                response ?? {},
+                (p, v) => p.function({
+                    req,
+                    serverOpts: options,
+                    response: v,
+                    clientId: client_id
+                }, this.eventEmitter) as any
+            );
+
+            const url = `${redirect_uri}?${buildQuery({...response, state})}`;
+            res.header('Cache-Control', 'no-store').status(302).redirect(url);
         };
     }
 
@@ -700,7 +749,9 @@ export class AuthorizationServer {
                 });
             }
 
-            let flow = this.flows.find(imp => imp.endpoint === endpoint && imp.matchType === grant_type);
+            const gTypes = grant_type.split(' ');
+
+            let flow = this.flows.find(imp => imp.endpoint === endpoint && gTypes.includes(imp.matchType));
             if (!flow) {
                 this.eventEmitter.emit(Events.UNSUPPORTED_GRANT_TYPE, req);
                 return error(res, {
@@ -724,22 +775,41 @@ export class AuthorizationServer {
             if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
-            flow.function({
+            // Filter interceptors (by endpoint)
+            const scopeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint);
+
+            const responseOrError = await flow.function({
                 req,
                 serverOpts: options,
                 issueRefreshToken,
                 clientId: client_id
-            }, (response, err) => {
-                if (err)
-                    return error(res, {
-                        error: err.error,
-                        error_description: err.error_description,
-                        error_uri: err.error_uri ?? options.errorUri,
-                        status: err.status
-                    });
-
-                res.header('Cache-Control', 'no-store').status(200).json(response);
             }, this.eventEmitter);
+
+            if ((responseOrError as any).error)
+                return error(res, {
+                    error: (<any>responseOrError).error,
+                    error_description: (<any>responseOrError).error_description,
+                    error_uri: (<any>responseOrError).error_uri ?? options.errorUri,
+                    status: (<any>responseOrError).status
+                });
+
+            let response: {[key: string]: string | number} = <any>responseOrError;
+
+            // Filter interceptor by scope here (because only here we know the scope)
+            const scopes = (response as ARTokens).scope?.split(options.scopeDelimiter) ?? [];
+
+            // Call interceptors
+            response = await passToNext(scopeInterceptors.filter(it => scopes.includes((it as any).matchScope)),
+                response ?? {},
+                (p, v) => p.function({
+                    req,
+                    serverOpts: options,
+                    response: v,
+                    clientId: client_id
+                }, this.eventEmitter) as any
+            );
+
+            res.header('Cache-Control', 'no-store').status(200).json(response);
         };
     }
 }

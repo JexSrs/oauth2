@@ -9,7 +9,7 @@ export function implicit(opts?: ImplicitOptions): Flow {
         name: 'implicit',
         endpoint: 'authorize',
         matchType: 'token',
-        function: async (data, callback, eventEmitter) => {
+        function: async (data, eventEmitter) => {
 
             // Generate access token
             let tokens = await generateARTokens({
@@ -34,14 +34,14 @@ export function implicit(opts?: ImplicitOptions): Flow {
 
             if (!dbRes) {
                 eventEmitter.emit(Events.FAILED_TOKEN_SAVE, data.req);
-                return callback(undefined, {
+                return {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error',
                     error_uri: options.errorUri
-                });
+                };
             }
 
-            callback(tokens);
+            return tokens;
         }
     }
 }

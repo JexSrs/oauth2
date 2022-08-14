@@ -7,7 +7,7 @@ const chai = require("chai");
 describe("Other flows", function () {
     this.timeout(60 * 1000);
 
-    it('Device flow', () => {
+    it('Device Authorization', () => {
 
         function ask(device_code) {
             return axios.post(DATA.AUTHORIZATION_URL + '/oauth/v2/token', buildQuery({

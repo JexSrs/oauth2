@@ -246,6 +246,9 @@ Used by the
 [`token`](functions_and_endpoints.md#token),
 [`deviceAuthorization`](functions_and_endpoints.md#device-authorization)
 functions to inquire if a refresh token will be generated for this client.
+It will not generate a refresh token if the
+[`Refresh Token`](../flows/refresh_token.md)
+flow is not used.
 It defaults tp `true` for all clients.
 
 This option also supports asynchronous calls.

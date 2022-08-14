@@ -13,22 +13,22 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
         name: 'resource-owner-credentials',
         endpoint: 'token',
         matchType: 'password',
-        function: async (data, callback, eventEmitter) => {
+        function: async (data, eventEmitter) => {
             const {scope, username, password} = data.req.body;
 
             if (!username)
-                return callback(undefined, {
+                return {
                     error: 'invalid_request',
                     error_description: 'Body parameter username is missing',
                     error_uri: options.errorUri
-                });
+                };
 
             if (!password)
-                return callback(undefined, {
+                return {
                     error: 'invalid_request',
                     error_description: 'Body parameter password is missing',
                     error_uri: options.errorUri
-                });
+                };
 
             let scopes = scope?.split(' ') || [];
             const scopeResult = await data.serverOpts.validateScopes(scopes, data.req);
@@ -36,21 +36,21 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
                 scopes = scopeResult;
             else if (scopeResult === false) {
                 eventEmitter.emit(Events.INVALID_SCOPES, data.req);
-                return callback(undefined, {
+                return {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable',
                     error_uri: options.errorUri
-                });
+                };
             }
 
             let user = await opts.validateUser(username, password, data.req);
             if (user == null) {
                 eventEmitter.emit(Events.INVALID_USER, data.req);
-                return callback(undefined, {
+                return {
                     error: 'invalid_grant',
                     error_description: 'User authentication failed',
                     error_uri: options.errorUri
-                });
+                };
             }
 
             // Generate access & refresh tokens
@@ -78,14 +78,14 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
 
             if (!dbRes) {
                 eventEmitter.emit(Events.FAILED_TOKEN_SAVE, data.req);
-                return callback(undefined, {
+                return {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error',
                     error_uri: options.errorUri
-                });
+                };
             }
 
-            callback(tokens);
+            return tokens;
         }
     }
 }

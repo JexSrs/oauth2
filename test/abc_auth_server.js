@@ -48,7 +48,8 @@ let authSrv = new AuthorizationServer({
     validateRequest: (req) => true,
     setPayloadLocation: (req, payload) => req.payload = payload,
     getClientCredentials: 'body',
-    issuer: 'me',
+    baseUrl: 'me',
+    audience: () => "me",
     validateClient: (client_id, client_secret) =>
         client_id === DATA.CLIENT_ID && (client_secret === undefined ? true : client_secret === DATA.CLIENT_SECRET),
     revoke: (data, req) => {

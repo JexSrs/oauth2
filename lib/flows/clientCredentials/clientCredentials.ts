@@ -10,7 +10,7 @@ export function clientCredentials(opts?: ClientCredentialsOptions): Flow {
         name: 'client-credentials',
         endpoint: 'token',
         matchType: 'client_credentials',
-        function: async (data, callback, eventEmitter) => {
+        function: async (data, eventEmitter) => {
             const {scope} = data.req.body;
 
             // Validate scopes
@@ -20,11 +20,11 @@ export function clientCredentials(opts?: ClientCredentialsOptions): Flow {
                 scopes = scopeResult;
             else if (scopeResult === false) {
                 eventEmitter.emit(Events.INVALID_SCOPES, data.req);
-                return callback(undefined, {
+                return {
                     error: 'invalid_scope',
                     error_description: 'One or more scopes are not acceptable',
                     error_uri: options.errorUri
-                });
+                };
             }
 
             // Generate access token
@@ -47,15 +47,15 @@ export function clientCredentials(opts?: ClientCredentialsOptions): Flow {
 
             if (!dbRes) {
                 eventEmitter.emit(Events.FAILED_TOKEN_SAVE, data.req);
-                return callback(undefined, {
+                return {
                     error: 'server_error',
                     error_description: 'Encountered an unexpected error',
                     error_uri: options.errorUri
-                });
+                };
             }
 
             // Respond with access token
-            callback(tokens);
+            return tokens;
         }
     }
 }

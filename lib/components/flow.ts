@@ -2,6 +2,7 @@ import {OAuth2Error} from "./types";
 import {AuthorizationServerOptions} from "./authorizationServerOptions.js";
 import EventEmitter from "events";
 
+type FlowReturn = object | (OAuth2Error & { status?: number; });
 
 export interface Flow {
     name: string;
@@ -22,7 +23,6 @@ export interface Flow {
             /** Only if the flow is called by the 'authorize' function, the user's identification. */
             user?: any;
         },
-        callback: (response?: object, err?: OAuth2Error & {status?: number; } & object) => void,
         eventEmitter: EventEmitter
-    ) => void | Promise<void>;
+    ) => Promise<FlowReturn> | FlowReturn;
 }

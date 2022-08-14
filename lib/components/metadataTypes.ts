@@ -1,7 +1,7 @@
 // {
 //   "token_endpoint_auth_methods_supported": ["client_secret_basic", "private_key_jwt"],
 //   "token_endpoint_auth_signing_alg_values_supported": ["RS256", "ES256"],
-//   "scopes_supported": ["openid", "profile", "email", "address", "phone", "offline_access"],
+//   "scopes_supported": ["openIdConnect", "profile", "email", "address", "phone", "offline_access"],
 // } TODO
 
 export type MetadataOptions = {
