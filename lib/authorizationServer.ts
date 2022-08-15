@@ -45,12 +45,6 @@ import {decode} from "jsonwebtoken";
 // TODO - Add notBefore in options for jwt. It will be fixed value like accessTokenLifetime.
 // TODO - Maybe add a function to determinate the lifetime & notBefore of tokens (access & refresh).
 
-// TODO - Add jwt subject as JSON.stringify(user)
-
-// TODO - Find a way for flows to call interceptors, but be careful not the interceptor to be called twice.
-//      - this will be useful not writing openIdConnect code twice, once for response_type=id_token and once
-//      - when the token is generated at the authorization_code flow
-
 export class AuthorizationServer {
 
     /**
@@ -178,6 +172,9 @@ export class AuthorizationServer {
             if (!(it as any).matchType && !(it as any).matchScope)
                 throw new Error(`Interceptor ${it.name} has empty matchType and matchScope which is not allowed`);
 
+            if ((it as any).matchType && (it as any).matchScope)
+                throw new Error(`Interceptor ${it.name} has both matchType and matchScope which is not allowed`);
+
             // ... Interceptors can share the same matchTypes
 
             if (typeof it.function !== 'function')
@@ -220,6 +217,12 @@ export class AuthorizationServer {
             }
 
             const {client_id, redirect_uri, state, scope, response_type} = dataFrom;
+
+            if(Array.isArray(client_id) || Array.isArray(redirect_uri) || Array.isArray(state) || Array.isArray(scope) || Array.isArray(response_type))
+                return error(res, {
+                    error: 'invalid_request',
+                    error_description: 'One or more parameters are repeated',
+                });
 
             if (!client_id)
                 return error(res, {
@@ -712,7 +715,8 @@ export class AuthorizationServer {
             },
             secret: this.options.secret,
             issuer: this.options.baseUrl,
-            audience: undefined
+            audience: undefined,
+            subject: undefined
         });
 
         return (req, res, next) => res.status(200).json(metadata);
@@ -743,9 +747,10 @@ export class AuthorizationServer {
 
             if (!(await options.validateClient(client_id, client_secret, req))) {
                 return error(res, {
-                    error: 'unauthorized_client',
+                    error: 'invalid_client',
                     error_description: 'Client authentication failed',
-                    error_uri: options.errorUri
+                    error_uri: options.errorUri,
+                    status: 401
                 });
             }
 
@@ -776,7 +781,8 @@ export class AuthorizationServer {
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
             // Filter interceptors (by endpoint)
-            const scopeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint);
+            const typeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint && gTypes.includes(it.matchType));
+            let scopeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint);
 
             const responseOrError = await flow.function({
                 req,
@@ -797,9 +803,10 @@ export class AuthorizationServer {
 
             // Filter interceptor by scope here (because only here we know the scope)
             const scopes = (response as ARTokens).scope?.split(options.scopeDelimiter) ?? [];
+            scopeInterceptors = scopeInterceptors.filter(it => scopes.includes((it as any).matchScope));
 
             // Call interceptors
-            response = await passToNext(scopeInterceptors.filter(it => scopes.includes((it as any).matchScope)),
+            response = await passToNext([...typeInterceptors, ...scopeInterceptors],
                 response ?? {},
                 (p, v) => p.function({
                     req,

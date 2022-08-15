@@ -9,6 +9,7 @@ export function signToken(data: {
     secret: string;
     expiresIn?: number,
     audience?: string;
+    subject: any;
     issuer: string;
 }): string {
     for(const key in data.payload) {
@@ -26,6 +27,7 @@ export function signToken(data: {
         audience: data.audience,
         issuer: data.issuer,
         jwtid: randStr(32),
+        subject: JSON.stringify(data.subject)
     });
 }
 
@@ -54,6 +56,7 @@ export async function generateARTokens(data: {
     req: any;
     payload: object;
     clientId: any;
+    user?: any;
     scopes: string[] | {
         refresh: string[];
         access: string[];
@@ -74,8 +77,10 @@ export async function generateARTokens(data: {
             ...data.payload,
             type: 'access_token',
             client_id: data.clientId,
+            user: data.user,
             scopes: accessTokenScopes
         },
+        subject: data.user,
         secret: data.opts.secret,
         expiresIn: data.opts.accessTokenLifetime ?? undefined,
         audience,
@@ -90,8 +95,10 @@ export async function generateARTokens(data: {
                 ...data.payload,
                 type: 'refresh_token',
                 client_id: data.clientId,
+                user: data.user,
                 scopes: refreshTokenScopes
             },
+            subject: data.user,
             secret: data.opts.secret,
             expiresIn: data.opts.refreshTokenLifetime ?? undefined,
             audience,

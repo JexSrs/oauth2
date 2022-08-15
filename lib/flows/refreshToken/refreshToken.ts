@@ -93,9 +93,8 @@ export function refreshToken(opts?: RefreshTokenOptions): Flow {
             // Generate new tokens
             let tokens = await generateARTokens({
                 req: data.req,
-                payload: {
-                    user: refreshTokenPayload.user
-                },
+                payload: {},
+                user: refreshTokenPayload.user,
                 clientId: data.clientId,
                 scopes,
                 opts: data.serverOpts,

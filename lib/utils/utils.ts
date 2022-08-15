@@ -89,7 +89,7 @@ export function isLocalhost(uri: string): boolean {
 }
 
 export function isRedirectUriExactMatch(original: string, fromClient: any): boolean {
-    // If not localhost return exact match
+    // If original is not `localhost` return exact match
     if(!isLocalhost(original))
         return original === fromClient;
 

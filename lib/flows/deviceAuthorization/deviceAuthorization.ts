@@ -120,7 +120,8 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                     secret: data.serverOpts.secret,
                     expiresIn: options.interval,
                     issuer: data.serverOpts.baseUrl,
-                    audience: data.serverOpts.baseUrl
+                    audience: data.serverOpts.baseUrl,
+                    subject: undefined
                 });
                 await options.saveBucket(device_code, bucket, options.interval!, data.req);
 
@@ -177,9 +178,8 @@ export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {
                 // Generate access & refresh tokens
                 let tokens = await generateARTokens({
                     req: data.req,
-                    payload: {
-                        user
-                    },
+                    payload: {},
+                    user,
                     clientId: data.clientId,
                     scopes: dbDev.scopes,
                     opts: data.serverOpts,

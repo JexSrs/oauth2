@@ -56,9 +56,8 @@ export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions):
             // Generate access & refresh tokens
             let tokens = await generateARTokens({
                 req: data.req,
-                payload: {
-                    user
-                },
+                payload: {},
+                user,
                 clientId: data.clientId,
                 scopes,
                 opts: data.serverOpts,

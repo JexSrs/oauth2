@@ -119,6 +119,7 @@ Used by the
 [`introspection`](functions_and_endpoints.md#introspection),
 [`revocation`](functions_and_endpoints.md#revocation)
 functions to inquire the location of the client's credentials (`client id` & `client secret`).
+The `client_id` is required to be present and the `client_secret` can be anything.
 
 These credentials will be called later by the [`validateClient`](#validateclient) option.
 

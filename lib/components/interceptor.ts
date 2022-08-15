@@ -17,6 +17,6 @@ export type Interceptor = {
     matchType: string;
 } | {
     endpoint: 'token' | 'device_authorization';
-    matchScope: string;
-    // matchType?: string;
+    matchScope?: string;
+    matchType?: string;
 });
