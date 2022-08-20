@@ -204,7 +204,7 @@ export class AuthorizationServer {
 
             const {client_id, redirect_uri, state, scope, response_type} = dataFrom;
 
-            if(Array.isArray(client_id) || Array.isArray(redirect_uri) || Array.isArray(state) || Array.isArray(scope) || Array.isArray(response_type))
+            if(Object.values(dataFrom).some(v => Array.isArray(v)))
                 return error(res, {
                     error: 'invalid_request',
                     error_description: 'One or more parameters are repeated',
@@ -714,6 +714,12 @@ export class AuthorizationServer {
 
             const {grant_type} = req.body;
             let {client_id, client_secret} = (options.getClientCredentials as any)(req);
+
+            // if(Object.values(req.body).some(v => Array.isArray(v)))
+            //     return error(res, {
+            //         error: 'invalid_request',
+            //         error_description: 'One or more parameters are repeated',
+            //     });
 
             if (!grant_type)
                 return error(res, {
