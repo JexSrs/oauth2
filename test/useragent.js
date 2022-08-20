@@ -1,4 +1,4 @@
-const {validateUserAgent} = require('../dist/utils/useragent');
+const {validateUserAgent} = require('../dist/utils/useragent.utils');
 const chai = require("chai");
 
 const iosValid = [

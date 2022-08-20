@@ -1,7 +1,7 @@
 const chai = require('chai');
 const axios = require("axios");
 const DATA = require("./data/data");
-const buildQuery = require("../dist/utils/utils").buildQuery;
+const buildQuery = require("../dist/utils/general.utils").buildQuery;
 
 
 describe("Revocation", function () {

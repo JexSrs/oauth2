@@ -1,12 +1,36 @@
-import {PlusUN, RevocationAsk, THAccessTokenAsk, THRefreshTokenAsk, THTokenSave} from "./types.js";
-import {MetadataOptions} from "./metadataTypes.js";
+import {PlusUN, RevocationAsk, THAccessTokenAsk, THRefreshTokenAsk, THTokenSave} from "./general.types.js";
+import {MetadataOptions} from "./metadata.types.js";
 
 export type AuthorizationServerOptions = {
-    /**
-     * Used by the `metadata` function to inquire a set of information about
-     * the authorization server.
-     */
-    metadata?: MetadataOptions;
+    // * [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414): OAuth 2.0 Authorization Server Metadata
+    //
+    // ### `metadata`
+    // Used by the
+    // [`metadata`](functions_and_endpoints.md#metadata)
+    // function to inquire a set of information about the authorization server.
+    //
+    //
+    // ## Metadata
+    // The `metadata` function is assigned to the `metatdata` endpoint
+    // The `metadata` endpoint is used by the clients to access information about
+    // the authorization server such the authorization/token/revocation url.
+    //
+    // ### How to use
+    // The `metadata` function is called directly.
+    // ```javascript
+    // app.get('/api/oauth/v2/metadata', authServer.metadata());
+    // ```
+    //
+    // ### Break down
+    // The `metadata` function will follow the order below:
+    // * Create the metadata from [`metadata`](./authorization_server.md#metadata) option.
+    //
+    //
+    // /**
+    //  * Used by the `metadata` function to inquire a set of information about
+    //  * the authorization server.
+    //  */
+    // metadata?: MetadataOptions;
     /**
      * Used by the `authenticate` function to inquire about the
      * location of the access token. It defaults to the authorization header.

@@ -174,18 +174,3 @@ The `authenticate` function will follow the order below:
 * Check if the scopes are sufficient.
 * Execute the [`setPayloadLocation`](./authorization_server.md#setpayloadlocation) option.
 * Proceed to the next middleware.
-
-## Metadata
-The `metadata` function is assigned to the `metatdata` endpoint
-The `metadata` endpoint is used by the clients to access information about
-the authorization server such the authorization/token/revocation url.
-
-### How to use
-The `metadata` function is called directly.
-```javascript
-app.get('/api/oauth/v2/metadata', authServer.metadata());
-```
-
-### Break down
-The `metadata` function will follow the order below:
-* Create the metadata from [`metadata`](./authorization_server.md#metadata) option.

@@ -1,12 +1,12 @@
-import {ARTokens, ExpressMiddleware, RevocationAsk} from "./components/types";
-import {buildQuery, error, isRedirectUriExactMatch, passToNext, resolveUrl} from "./utils/utils";
-import {validateUserAgent} from "./utils/useragent";
-import {signToken, verifyToken} from './utils/tokenUtils'
+import {ARTokens, ExpressMiddleware, RevocationAsk} from "./components/general.types.js";
+import {buildQuery, error, isRedirectUriExactMatch, passToNext, resolveUrl} from "./utils/general.utils.js";
+import {validateUserAgent} from "./utils/useragent.utils.js";
+import {signToken, verifyToken} from './utils/token.utils.js'
 import {Flow} from "./components/flow";
-import {AuthorizationServerOptions} from "./components/authorizationServerOptions.js";
+import {AuthorizationServerOptions} from "./components/authorizationServer.options.js";
 import EventEmitter from "events";
 import {Events} from "./components/events";
-import {Metadata} from "./components/metadataTypes.js";
+import {Metadata} from "./components/metadata.types.js";
 import {Interceptor} from "./components/interceptor.js";
 import {decode} from "jsonwebtoken";
 
@@ -18,25 +18,18 @@ import {decode} from "jsonwebtoken";
 // https://datatracker.ietf.org/doc/html/draft-fett-oauth-dpop (experimental)
 // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-incremental-authz (experimental)
 
-// TODO - https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05
-
 // TODO - https://datatracker.ietf.org/doc/html/rfc7521
 // TODO - https://datatracker.ietf.org/doc/html/rfc7523
 // TODO - https://datatracker.ietf.org/doc/html/rfc7522
 
 // TODO - https://datatracker.ietf.org/doc/html/rfc9126 (experimental)
 
-// TODO - OpenID Connect - https://openid.net/connect/ - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
-// TODO - indieAuth - https://indieauth.spec.indieweb.org/
-// TODO - UMA2 - https://docs.kantarainitiative.org/uma/wg/rec-oauth-uma-grant-2.0.html
-
 // TODO - https://datatracker.ietf.org/doc/html/rfc7591
 // TODO - https://datatracker.ietf.org/doc/html/rfc7592
 
-// TODO - Support Mac -> token_type https://stackoverflow.com/questions/5925954/what-are-bearer-tokens-and-token-type-in-oauth-2
-//      - https://duckduckgo.com/?t=ffab&q=OAuth-HTTP-MAC&ia=web
+// TODO - OpenID Connect - https://openid.net/connect/ - https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#endpoint
 
-// TODO - Device identification - https://datatracker.ietf.org/doc/html/rfc6819#section-5.2.2.5
+// TODO - Device identification (constraint token to device) - https://datatracker.ietf.org/doc/html/rfc6819#section-5.2.2.5
 // TODO - device endpoint - https://datatracker.ietf.org/doc/html/rfc8628#section-5.1
 
 // TODO - Add access/refresh token refresh count, can execute the refresh flow x times (meaning you can request new access token x times, after that you cannot).
@@ -44,6 +37,7 @@ import {decode} from "jsonwebtoken";
 
 // TODO - Add notBefore in options for jwt. It will be fixed value like accessTokenLifetime.
 // TODO - Maybe add a function to determinate the lifetime & notBefore of tokens (access & refresh).
+
 
 export class AuthorizationServer {
 
@@ -168,14 +162,6 @@ export class AuthorizationServer {
             if (!it.name) throw new Error('Interceptor name is missing');
             if (!['authorize', 'token', 'device_authorization'].includes(it.endpoint))
                 throw new Error(`Interceptor ${it.name} has invalid endpoint`);
-
-            if (!(it as any).matchType && !(it as any).matchScope)
-                throw new Error(`Interceptor ${it.name} has empty matchType and matchScope which is not allowed`);
-
-            if ((it as any).matchType && (it as any).matchScope)
-                throw new Error(`Interceptor ${it.name} has both matchType and matchScope which is not allowed`);
-
-            // ... Interceptors can share the same matchTypes
 
             if (typeof it.function !== 'function')
                 throw new Error(`Interceptor ${it.name} has invalid function`);
@@ -339,9 +325,6 @@ export class AuthorizationServer {
             if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
-            // Find interceptor
-            const typeInterceptors = this.interceptors.filter(it => it.endpoint === 'authorize' && rTypes.includes(it.matchType));
-
             // Call implementation function
             const responseOrError = await flow.function({
                 req,
@@ -363,7 +346,7 @@ export class AuthorizationServer {
             let response: {[key: string]: string | number} = <any>responseOrError;
 
             // Call interceptors
-            response = await passToNext(typeInterceptors,
+            response = await passToNext(this.interceptors.filter(it => it.endpoint === 'authorize'),
                 response ?? {},
                 (p, v) => p.function({
                     req,
@@ -374,7 +357,7 @@ export class AuthorizationServer {
             );
 
             const url = `${redirect_uri}?${buildQuery({...response, state})}`;
-            res.header('Cache-Control', 'no-store').status(302).redirect(url);
+            res.header('Cache-Control', 'no-store').status(303).redirect(url);
         };
     }
 
@@ -660,67 +643,67 @@ export class AuthorizationServer {
         };
     }
 
-    /**
-     * The metadata function.
-     */
-    public metadata(): ExpressMiddleware {
-        const data = this.options.metadata;
-        if (!data) throw new Error('AuthorizationServerException metadata was notdefined in options.')
-
-        const authorizationTypes = this.flows.filter(flow => flow.endpoint === 'authorize').map(flow => flow.matchType);
-        const tokenTypes = this.flows.filter(flow => flow.endpoint === 'token').map(flow => flow.matchType);
-
-        if (authorizationTypes.length > 0 && !data.authorizationPath)
-            throw new Error('AuthorizationServerException Authorization endpoint is missing');
-
-        if (tokenTypes.length > 0 && !data.tokenPath)
-            throw new Error('AuthorizationServerException Token endpoint is missing');
-
-        let metadata: Partial<Metadata> = {
-            // Flows
-            response_types_supported: authorizationTypes,
-            grant_types_supported: tokenTypes.length > 0 ? tokenTypes : ['authorization_code', 'implicit'],
-
-            // Endpoints
-            authorization_endpoint: resolveUrl(this.options.baseUrl, data.authorizationPath!),
-            token_endpoint: resolveUrl(this.options.baseUrl, data.tokenPath!),
-            registration_endpoint: data.registrationPath ? resolveUrl(this.options.baseUrl, data.registrationPath) : undefined,
-            revocation_endpoint: data.revocationPath ? resolveUrl(this.options.baseUrl, data.revocationPath) : undefined,
-            introspection_endpoint: data.introspectionPath ? resolveUrl(this.options.baseUrl, data.introspectionPath) : undefined,
-            device_authorization_endpoint: data.deviceAuthorizationPath ? resolveUrl(this.options.baseUrl, data.deviceAuthorizationPath) : undefined,
-
-            // Other
-            issuer: this.options.baseUrl,
-            ui_locales_supported: data.ui_locales_supported,
-
-            jwks_uri: data.jwksUri,
-            scopes_supported: data.scopes_supported ?? [],
-            response_modes_supported: data.response_modes_supported ?? ['query', 'fragment'],
-            token_endpoint_auth_methods_supported: data.token_endpoint_auth_methods_supported ?? ['client_secret_basic'],
-            token_endpoint_auth_signing_alg_values_supported: data.token_endpoint_auth_signing_alg_values_supported,
-            service_documentation: data.serviceDocumentation,
-            op_policy_uri: data.op_policy_uri,
-            op_tos_uri: data.op_tos_uri,
-            revocation_endpoint_auth_methods_supported: data.revocation_endpoint_auth_methods_supported ?? ['client_secret_basic'],
-            revocation_endpoint_auth_signing_alg_values_supported: data.revocation_endpoint_auth_signing_alg_values_supported,
-            introspection_endpoint_auth_signing_alg_values_supported: data.introspection_endpoint_auth_signing_alg_values_supported,
-            introspection_endpoint_auth_methods_supported: data.introspection_endpoint_auth_methods_supported,
-            code_challenge_methods_supported: data.code_challenge_methods_supported,
-        };
-
-        metadata.signed_metadata = signToken({
-            payload: {
-                ...metadata,
-                issuer: undefined
-            },
-            secret: this.options.secret,
-            issuer: this.options.baseUrl,
-            audience: undefined,
-            subject: undefined
-        });
-
-        return (req, res, next) => res.status(200).json(metadata);
-    }
+    // /**
+    //  * The metadata function.
+    //  */
+    // public metadata(): ExpressMiddleware {
+    //     const data = this.options.metadata;
+    //     if (!data) throw new Error('AuthorizationServerException metadata was notdefined in options.')
+    //
+    //     const authorizationTypes = this.flows.filter(flow => flow.endpoint === 'authorize').map(flow => flow.matchType);
+    //     const tokenTypes = this.flows.filter(flow => flow.endpoint === 'token').map(flow => flow.matchType);
+    //
+    //     if (authorizationTypes.length > 0 && !data.authorizationPath)
+    //         throw new Error('AuthorizationServerException Authorization endpoint is missing');
+    //
+    //     if (tokenTypes.length > 0 && !data.tokenPath)
+    //         throw new Error('AuthorizationServerException Token endpoint is missing');
+    //
+    //     let metadata: Partial<Metadata> = {
+    //         // Flows
+    //         response_types_supported: authorizationTypes,
+    //         grant_types_supported: tokenTypes.length > 0 ? tokenTypes : ['authorization_code', 'implicit'],
+    //
+    //         // Endpoints
+    //         authorization_endpoint: resolveUrl(this.options.baseUrl, data.authorizationPath!),
+    //         token_endpoint: resolveUrl(this.options.baseUrl, data.tokenPath!),
+    //         registration_endpoint: data.registrationPath ? resolveUrl(this.options.baseUrl, data.registrationPath) : undefined,
+    //         revocation_endpoint: data.revocationPath ? resolveUrl(this.options.baseUrl, data.revocationPath) : undefined,
+    //         introspection_endpoint: data.introspectionPath ? resolveUrl(this.options.baseUrl, data.introspectionPath) : undefined,
+    //         device_authorization_endpoint: data.deviceAuthorizationPath ? resolveUrl(this.options.baseUrl, data.deviceAuthorizationPath) : undefined,
+    //
+    //         // Other
+    //         issuer: this.options.baseUrl,
+    //         ui_locales_supported: data.ui_locales_supported,
+    //
+    //         jwks_uri: data.jwksUri,
+    //         scopes_supported: data.scopes_supported ?? [],
+    //         response_modes_supported: data.response_modes_supported ?? ['query', 'fragment'],
+    //         token_endpoint_auth_methods_supported: data.token_endpoint_auth_methods_supported ?? ['client_secret_basic'],
+    //         token_endpoint_auth_signing_alg_values_supported: data.token_endpoint_auth_signing_alg_values_supported,
+    //         service_documentation: data.serviceDocumentation,
+    //         op_policy_uri: data.op_policy_uri,
+    //         op_tos_uri: data.op_tos_uri,
+    //         revocation_endpoint_auth_methods_supported: data.revocation_endpoint_auth_methods_supported ?? ['client_secret_basic'],
+    //         revocation_endpoint_auth_signing_alg_values_supported: data.revocation_endpoint_auth_signing_alg_values_supported,
+    //         introspection_endpoint_auth_signing_alg_values_supported: data.introspection_endpoint_auth_signing_alg_values_supported,
+    //         introspection_endpoint_auth_methods_supported: data.introspection_endpoint_auth_methods_supported,
+    //         code_challenge_methods_supported: data.code_challenge_methods_supported,
+    //     };
+    //
+    //     metadata.signed_metadata = signToken({
+    //         payload: {
+    //             ...metadata,
+    //             issuer: undefined
+    //         },
+    //         secret: this.options.secret,
+    //         issuer: this.options.baseUrl,
+    //         audience: undefined,
+    //         subject: undefined
+    //     });
+    //
+    //     return (req, res, next) => res.status(200).json(metadata);
+    // }
 
     private postEndpoint(options: Required<AuthorizationServerOptions>, endpoint: string): ExpressMiddleware {
         return async (req, res, next) => {
@@ -780,10 +763,6 @@ export class AuthorizationServer {
             if (issueRefreshToken)
                 issueRefreshToken = await options.issueRefreshTokenForThisClient(client_id, req);
 
-            // Filter interceptors (by endpoint)
-            const typeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint && gTypes.includes(it.matchType));
-            let scopeInterceptors = this.interceptors.filter(it => it.endpoint === endpoint);
-
             const responseOrError = await flow.function({
                 req,
                 serverOpts: options,
@@ -801,12 +780,8 @@ export class AuthorizationServer {
 
             let response: {[key: string]: string | number} = <any>responseOrError;
 
-            // Filter interceptor by scope here (because only here we know the scope)
-            const scopes = (response as ARTokens).scope?.split(options.scopeDelimiter) ?? [];
-            scopeInterceptors = scopeInterceptors.filter(it => scopes.includes((it as any).matchScope));
-
             // Call interceptors
-            response = await passToNext([...typeInterceptors, ...scopeInterceptors],
+            response = await passToNext(this.interceptors.filter(it => it.endpoint === endpoint),
                 response ?? {},
                 (p, v) => p.function({
                     req,

@@ -30,7 +30,8 @@ export type ResourceServerOptions = {
     body?: { [key: string]: string | string[] };
     /**
      * Used by the `authenticate` function of the `ResoureServer` to inquire the location
-     * of the `introspection` endpoint.
+     * of the `introspection` endpoint. If not set it will validate the client using JWT
+     * verification without asking the authorization server.
      */
     introspectionURL?: string;
     /**
@@ -60,10 +61,10 @@ export type ResourceServerOptions = {
      * request (that needs authentication) in the resource server. On the other hand you will
      * not be able to revoke an access token until it has expired on its own.
      */
-    secret?: string;
+    secret: string;
     /**
      * If you use the `secret` option above you also have to define the `issuer` option
      * with the same value as the authorization server `issuer` option.
      */
-    issuer?: string;
+    issuer: string;
 };

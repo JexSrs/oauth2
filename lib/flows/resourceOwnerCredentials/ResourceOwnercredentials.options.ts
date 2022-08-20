@@ -1,4 +1,4 @@
-import {PlusUN} from "../../components/types";
+import {PlusUN} from "../../components/general.types.js";
 
 export type ResourceOwnerCredentialsOptions = {
     /**

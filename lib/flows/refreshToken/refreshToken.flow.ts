@@ -1,6 +1,6 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt, verifyToken} from "../../utils/tokenUtils";
-import {RefreshTokenOptions} from "./rtOptions.js";
+import {generateARTokens, getTokenExpiresAt, verifyToken} from "../../utils/token.utils.js";
+import {RefreshTokenOptions} from "./refreshToken.options.js";
 import {Events} from "../../components/events";
 
 export function refreshToken(opts?: RefreshTokenOptions): Flow {

@@ -1,5 +1,5 @@
-import {OAuth2Error} from "./types";
-import {AuthorizationServerOptions} from "./authorizationServerOptions.js";
+import {OAuth2Error} from "./general.types.js";
+import {AuthorizationServerOptions} from "./authorizationServer.options.js";
 import EventEmitter from "events";
 
 type FlowReturn = object | (OAuth2Error & { status?: number; });

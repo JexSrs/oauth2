@@ -1,6 +1,6 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt} from "../../utils/tokenUtils";
-import {ResourceOwnerCredentialsOptions} from "./rocOptions.js";
+import {generateARTokens, getTokenExpiresAt} from "../../utils/token.utils.js";
+import {ResourceOwnerCredentialsOptions} from "./ResourceOwnercredentials.options.js";
 import {Events} from "../../components/events";
 
 export function resourceOwnerCredentials(opts: ResourceOwnerCredentialsOptions): Flow {

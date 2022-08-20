@@ -1,7 +1,7 @@
 import * as jwt from "jsonwebtoken";
-import {ARTokens} from "../components/types";
-import {AuthorizationServerOptions} from "../components/authorizationServerOptions.js";
-import {randStr} from "./utils";
+import {ARTokens} from "../components/general.types.js";
+import {AuthorizationServerOptions} from "../components/authorizationServer.options.js";
+import {randStr} from "./general.utils.js";
 
 
 export function signToken(data: {
@@ -17,7 +17,7 @@ export function signToken(data: {
             delete (<any>data.payload)[key]
     }
 
-    return jwt.sign(data.payload, data.secret, {
+    const opts: jwt.SignOptions = {
         // algorithm: 'RS256',
         // header: {
         //     alg: 'RS256',
@@ -27,8 +27,12 @@ export function signToken(data: {
         audience: data.audience,
         issuer: data.issuer,
         jwtid: randStr(32),
-        subject: JSON.stringify(data.subject)
-    });
+    };
+
+    if(data.subject)
+        opts.subject = JSON.stringify(data.subject)
+
+    return jwt.sign(data.payload, data.secret, opts);
 }
 
 /**
@@ -46,7 +50,12 @@ export function verifyToken(token: string, secret: string, audience: string | un
             audience,
             issuer,
             clockTolerance: 0,
+            // complete: true
         }) as any;
+        // return {
+        //     ...result.header,
+        //     ...result.payload as any,
+        // };
     } catch (e) {
         return null;
     }
@@ -109,7 +118,7 @@ export async function generateARTokens(data: {
         access_token: accessToken,
         token_type: 'Bearer',
         refresh_token: refreshToken,
-        scope: refreshTokenScopes.join(data.opts.scopeDelimiter)
+        scope: accessTokenScopes.join(data.opts.scopeDelimiter)
     };
 
     if (data.opts.accessTokenLifetime != null)

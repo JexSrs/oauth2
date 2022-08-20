@@ -1,7 +1,7 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt, signToken, verifyToken} from "../../utils/tokenUtils";
-import {DeviceAuthorizationOptions} from "./daOptions.js";
-import {error, randStr, userCodeGenerator} from "../../utils/utils";
+import {generateARTokens, getTokenExpiresAt, signToken, verifyToken} from "../../utils/token.utils.js";
+import {DeviceAuthorizationOptions} from "./deviceAuthorization.options.js";
+import {error, randStr, userCodeGenerator} from "../../utils/general.utils.js";
 import {Events} from "../../components/events";
 
 export function deviceAuthorization(opts: DeviceAuthorizationOptions): Flow[] {

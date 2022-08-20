@@ -2,12 +2,14 @@ const chai = require('chai');
 const axios = require("axios");
 const DATA = require("./data/data");
 const express = require("express");
-const buildQuery = require("../dist/utils/utils").buildQuery;
+const buildQuery = require("../dist/utils/general.utils").buildQuery;
 const {ResourceServer} = require('../dist');
 
 
 let resServer = new ResourceServer({
     introspectionURL: DATA.AUTHORIZATION_URL + '/oauth/v2/introspection',
+    secret: 'SUPER-DUPER-SECRET',
+    issuer: 'me',
     audience: "me",
     body: {
         client_id: DATA.CLIENT_ID,
@@ -71,6 +73,7 @@ describe("Introspection", function () {
             },
             validateStatus: (status) => true
         }).then(res => {
+            console.log(res.data)
             chai.expect(res.status).to.equal(200);
             chai.expect(res.data).to.equal('protected-content');
         });

@@ -1,4 +1,4 @@
-import {DFCodeAsk, DFCodeSave} from "../../components/types";
+import {DFCodeAsk, DFCodeSave} from "../../components/general.types.js";
 
 export type DeviceAuthorizationOptions = {
     /**

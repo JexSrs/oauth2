@@ -1,5 +1,5 @@
 const {signToken, verifyToken} = require('../dist');
-const {randStr} = require('../dist/utils/utils');
+const {randStr} = require('../dist/utils/general.utils');
 const chai = require("chai");
 
 const PAYLOAD = {

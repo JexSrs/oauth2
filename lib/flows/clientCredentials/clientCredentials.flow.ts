@@ -1,6 +1,6 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt} from "../../utils/tokenUtils";
-import {ClientCredentialsOptions} from "./ccOptions.js";
+import {generateARTokens, getTokenExpiresAt} from "../../utils/token.utils.js";
+import {ClientCredentialsOptions} from "./clientCredentials.options.js";
 import {Events} from "../../components/events";
 
 export function clientCredentials(opts?: ClientCredentialsOptions): Flow {

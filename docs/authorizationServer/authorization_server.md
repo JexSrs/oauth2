@@ -408,8 +408,3 @@ revoke: (data, req) => {
         return db.deleteAllTokens(data.refreshToken);
 }
 ```
-
-### `metadata`
-Used by the
-[`metadata`](functions_and_endpoints.md#metadata)
-function to inquire a set of information about the authorization server.

@@ -33,24 +33,22 @@ The parameters that will be passed are the following:
   * `clientId`: The authenticated client's id (aka `client_id`).
   * `scopes`: Accessible only from the [`authorize`] endpoint, it will contain the requested scopes.
   * `user`: Accessible only from the [`authorize`] endpoint, it will contain the user's id.
-* `callback`: It will return the response or an error.
-```javascript
-// Successful response
-callback({
-    access_token: ...,
-    refresh_token: ...,
-    // ...
-});
-
-// Error response:
-callback(undefined, {
-    error: 'error_message',
-    error_description: 'error_description',
-    error_uri: 'error_uri',
-    status: 400 // Will be omitted in `authorize` endpoint
-});
-```
 * `eventEmitter`: the event emitter that will emit all kinds of events.
+
+You have to return an object containing the desired response.
+If the response object contains the `error` key it will be treated as error.
+
+With the existence of the `error` key you can define the below keys:
+```typescript
+// The error message as described in OAuth2 core spec
+error: string;
+// A description that ecplains the error
+error_description: string;
+// An error uri as described in OAuth2 core spec
+error_uri: string,
+// The status of the request. It will be omitted in `authorize` endpoint.
+status?: number;
+```
 
 ## Multiple stages
 For flows that have multiple stages like the

@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import {OAuth2Error} from "../components/types";
+import {OAuth2Error} from "../components/general.types.js";
 
 /**
  * Will create a query string from an object.
@@ -78,7 +78,7 @@ export function error(res: any, data: OAuth2Error & { redirect_uri?: string; sta
         resp.state = data.state;
 
     if (data.redirect_uri)
-        res.redirect(`${data.redirect_uri}?${buildQuery(resp)}`);
+        res.status(303).redirect(`${data.redirect_uri}?${buildQuery(resp)}`);
     else
         res.status(data.status || 400).json(resp)
 }

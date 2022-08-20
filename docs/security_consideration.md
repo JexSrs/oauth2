@@ -144,3 +144,14 @@ than the user that initiated it.
 Fo more information read
 [Section 5.5](https://datatracker.ietf.org/doc/html/rfc8628#section-5.5)
 of OAuth 2.0 Device Authorization Grant.
+
+## Repeated Authorization Requests
+The authorization server should not process repeated authorization
+requests automatically (without active resource owner interaction)
+without authenticating the client or relying on other measures to
+ensure that the repeated request comes from the original client and
+not an impersonator.
+
+Fo more information read
+[Section 7.3](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-05#section-7.3)
+of The OAuth 2.1 Authorization Framework.

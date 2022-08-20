@@ -1,7 +1,7 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt} from "../../utils/tokenUtils";
+import {generateARTokens, getTokenExpiresAt} from "../../utils/token.utils.js";
 import {Events} from "../../components/events";
-import {ImplicitOptions} from "./implicitOptions";
+import {ImplicitOptions} from "./implicit.options.js";
 
 export function implicit(opts?: ImplicitOptions): Flow {
     const options = Object.assign({}, opts);

@@ -2,7 +2,7 @@ const chai = require('chai');
 const axios = require("axios");
 const DATA = require("./data/data");
 const express = require("express");
-const buildQuery = require("../dist/utils/utils").buildQuery;
+const buildQuery = require("../dist/utils/general.utils").buildQuery;
 
 const clientExpress = express();
 clientExpress.get('/callback', (req, res) => {

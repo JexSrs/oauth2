@@ -1,6 +1,6 @@
 // Types
-export {AuthorizationServerOptions} from "./components/authorizationServerOptions.js";
-export {ResourceServerOptions} from "./components/resourceServerOptions.js";
+export {AuthorizationServerOptions} from "./components/authorizationServer.options.js";
+export {ResourceServerOptions} from "./components/resourceServer.options.js";
 export {Flow} from "./components/flow";
 export {Interceptor} from "./components/interceptor.js";
 
@@ -9,9 +9,8 @@ export {AuthorizationServer} from "./authorizationServer";
 export {ResourceServer} from "./resourceServer";
 
 // Functions
-export {verifyToken, signToken, generateARTokens, getTokenExpiresAt} from "./utils/tokenUtils"
+export {verifyToken, signToken, generateARTokens, getTokenExpiresAt} from "./utils/token.utils.js"
 export * from "./flows";
-export * from "./interceptors";
 
 // Other
 export {Events} from "./components/events";

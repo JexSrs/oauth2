@@ -1,7 +1,7 @@
 import {Flow} from "../../components/flow";
-import {generateARTokens, getTokenExpiresAt, signToken, verifyToken} from "../../utils/tokenUtils";
-import {codeChallengeHash} from "../../utils/utils";
-import {AuthorizationCodeOptions} from "./acOptions";
+import {generateARTokens, getTokenExpiresAt, signToken, verifyToken} from "../../utils/token.utils.js";
+import {codeChallengeHash} from "../../utils/general.utils.js";
+import {AuthorizationCodeOptions} from "./authorizationCode.options.js";
 import {Events} from "../../components/events";
 
 export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {

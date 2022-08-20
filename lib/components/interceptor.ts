@@ -1,8 +1,9 @@
-import {AuthorizationServerOptions} from "./authorizationServerOptions.js";
+import {AuthorizationServerOptions} from "./authorizationServer.options.js";
 import EventEmitter from "events";
 
 export type Interceptor = {
     name: string;
+    endpoint: 'authorize' | 'token' | 'device_authorization';
     function: (
         data: {
             req: any;
@@ -12,11 +13,4 @@ export type Interceptor = {
         },
         eventEmitter: EventEmitter
     ) => object | Promise<object>;
-} & ({
-    endpoint: 'authorize';
-    matchType: string;
-} | {
-    endpoint: 'token' | 'device_authorization';
-    matchScope?: string;
-    matchType?: string;
-});
+};

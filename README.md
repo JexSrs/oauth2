@@ -7,9 +7,9 @@
 * [Installation](#installation)
 * [Authorization server](#authorization-server)
   * [Flows](#flows)
+  * [Interceptors](#interceptors)
   * [Events](#events)
   * [Functions & Endpoints](#functions--endpoints)
-  * [Metadata](#metadata)
   * [State](#state)
 * [Resource server](#resource-server)
 * [Security considerations](#security-considerations)
@@ -27,10 +27,11 @@ You can see with more detail the specs that was used below:
 * [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750): Bearer Tokens
 * [RFC6819](https://datatracker.ietf.org/doc/html/rfc6819): Threat Model and Security Consideration
 * [RFC7009](https://datatracker.ietf.org/doc/html/rfc7009): Token Revocation
+* [RFC7515](https://www.rfc-editor.org/rfc/rfc7515): JSON Web Signature
+* [RFC7519](https://www.rfc-editor.org/rfc/rfc7519): JSON Web Token
 * [RFC7636](https://datatracker.ietf.org/doc/html/rfc7636): PKCE Extension
 * [RFC7662](https://datatracker.ietf.org/doc/html/rfc7662): Token Introspection
 * [RFC8252](https://datatracker.ietf.org/doc/html/rfc8252): OAuth 2.0 for Native Apps
-* [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414): OAuth 2.0 Authorization Server Metadata
 * [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628): Device Authorization Grant
 * [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068): JWT Profile for OAuth 2.0 Access Tokens
 * [OAuth 2.0 Security Best Current Practice](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics)
@@ -39,7 +40,8 @@ You can see with more detail the specs that was used below:
 * [RFC9068](https://datatracker.ietf.org/doc/html/rfc9068) (JWT Profile for OAuth 2.0 Access Tokens)
   * The claim `sub` (subject) must contain the user's or client'd id.
 The user's id in this library can be any valid json or primitive type which does not comply
-with the claim's (`sub`) type which is string. It will be replaced inside the payload by the field `user`.
+with the claim's (`sub`) type which is string. It will be replaced inside the payload by the field `user`
+and the `sub` claim will be  string version of it (by calling `JSON.stringify(user)`).
   * The parameter `resource` will not be used, instead the Authorization Server
 should decide the `audience` claim using the [`audience`](./docs/authorizationServer#audience)
 option.
@@ -105,6 +107,26 @@ authServer.use(my_flow);
 
 Click [here](docs/authorizationServer/new_flow.md) for mor details about how to create a new flow.
 
+## Interceptors
+A successful OAuth2 response is a response that does not return an error.
+`Interceptor` is a function that will be called to alter a successful OAuth2 response.
+It can be called from all
+[`endpoints`](./docs/authorizationServer/functions_and_endpoints.md)
+and intercept all successful responses.
+
+Interceptors are useful in case you want to append more information to a response.
+For example Google-OAuth2 will return an email alongside the tokens.
+
+To use an interceptor you have to call the `intercept` function:
+```javascript
+authServer.intercept(myInterceptor);
+```
+
+Interceptors are called with the order they are registered.
+
+Click [here](docs/authorizationServer/new_interceptor.md) for mor details about how to
+create a new interceptor.
+
 ### Events
 Using the NodeJs [`EventEmitter`](https://nodejs.dev/learn/the-nodejs-event-emitter) the `oauth2`
 library provides a set of useful events to help you keep track the progress of all the flows.
@@ -134,11 +156,6 @@ These functions are:
 * `authenticate`: A way to authenticate access tokens (if authorization and resource server are the same).
 
 Click [here](docs/authorizationServer/functions_and_endpoints.md) for more details about functions and endpoints.
-
-### Metadata
-
-[//]: # (TODO)
-https://datatracker.ietf.org/doc/html/rfc8414#section-3.3
 
 ### State
 If you have read all the documentation so far I am sure you have noticed how all options that provide

@@ -1,4 +1,4 @@
-import {THAuthorizationCodeAsk, THAuthorizationCodeSave} from "../../components/types";
+import {THAuthorizationCodeAsk, THAuthorizationCodeSave} from "../../components/general.types.js";
 
 export type AuthorizationCodeOptions = {
     /**
