@@ -1,13 +1,13 @@
 const axios = require("axios");
 const DATA = require("./data/data");
-const {buildQuery} = require("../dist/modules/utils");
+const {buildQuery} = require("../dist/utils/general.utils");
 const chai = require("chai");
 
 
-describe("Other implementations", function () {
+describe("Other flows", function () {
     this.timeout(60 * 1000);
 
-    it('Device flow', () => {
+    it('Device Authorization', () => {
 
         function ask(device_code) {
             return axios.post(DATA.AUTHORIZATION_URL + '/oauth/v2/token', buildQuery({
@@ -24,7 +24,7 @@ describe("Other implementations", function () {
         return new Promise(async (resolve, reject) => {
             try {
                 // Device code request
-                let res = await axios.post(DATA.AUTHORIZATION_URL + '/oauth/v2/device', buildQuery({
+                let res = await axios.post(DATA.AUTHORIZATION_URL + '/oauth/v2/device_authorization', buildQuery({
                     grant_type: 'token',
                     client_id: DATA.CLIENT_ID,
                     scope: 'scope1'

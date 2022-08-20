@@ -2,7 +2,7 @@ const chai = require('chai');
 const axios = require("axios");
 const DATA = require("./data/data");
 const express = require("express");
-const buildQuery = require("../dist/modules/utils").buildQuery;
+const buildQuery = require("../dist/utils/general.utils").buildQuery;
 
 const clientExpress = express();
 clientExpress.get('/callback', (req, res) => {
@@ -18,7 +18,7 @@ const server = clientExpress.listen(DATA.CLIENT_IMPLICIT_PORT, () => {
 
 setTimeout(server.close.bind(server), 60 * 1000);
 
-describe("Common implementations", function () {
+describe("Common flows", function () {
     this.timeout(10 * 1000);
 
     it('Implicit', () => {

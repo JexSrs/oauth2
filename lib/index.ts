@@ -1,17 +1,16 @@
 // Types
-export {AuthorizationServerOptions} from "./components/options/authorizationServerOptions";
-export {ResourceServerOptions} from "./components/options/resourceServerOptions";
-// export {ClientOptions} from "./components/options/clientOptions";
-export {Implementation} from "./components/implementation";
+export {AuthorizationServerOptions} from "./components/authorizationServer.options.js";
+export {ResourceServerOptions} from "./components/resourceServer.options.js";
+export {Flow} from "./components/flow";
+export {Interceptor} from "./components/interceptor.js";
 
 // Classes
 export {AuthorizationServer} from "./authorizationServer";
 export {ResourceServer} from "./resourceServer";
-// export {Client} from "./client";
 
 // Functions
-export {verifyToken, signToken, generateARTokens, getTokenExpiresAt} from "./modules/tokenUtils"
-export * from "./implementations";
+export {verifyToken, signToken, generateARTokens, getTokenExpiresAt} from "./utils/token.utils.js"
+export * from "./flows";
 
 // Other
 export {Events} from "./components/events";
