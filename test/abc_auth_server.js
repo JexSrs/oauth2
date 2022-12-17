@@ -67,7 +67,7 @@ let authSrv = new AuthorizationServer({
 });
 
 authSrv.use(authorizationCode({
-    usePKCE: true,
+    pkce: true,
     allowCodeChallengeMethodPlain: false,
     authorizationCodeLifetime: 10, // 10 seconds
     deleteAuthorizationCode: data => {

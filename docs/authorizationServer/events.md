@@ -111,7 +111,7 @@ option returns `false`.
 Called from the
 [`Authorization Code`](../flows/authorization_code.md)
 flow at the first stage when
-[`usePKCE`](../flows/authorization_code.md#usepkce)
+[`pkce`](../flows/authorization_code.md#pkce)
 is `true` and the fields `code_challenge`, `code_challenge_method`are not defined.
 Also called when the
 [`validCodeChallengeMethods`](../flows/authorization_code.md#validcodechallengemethods)
@@ -120,7 +120,7 @@ option returns `false`
 Called from the
 [`Authorization Code`](../flows/authorization_code.md)
 flow at the second stage when
-[`usePKCE`](../flows/authorization_code.md#usepkce)
+[`pkce`](../flows/authorization_code.md#pkce)
 is `true` and the
 [`hashCodeChallenge`](../flows/authorization_code.md#hashcodechallenge)
 option does not return the expected code challenge.

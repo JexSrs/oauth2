@@ -8,7 +8,7 @@ export type AuthorizationCodeOptions = {
      *
      * If PKCE is enabled the fields `code_challenge` and `code_challenge_method` must be included in the request.
      */
-    usePKCE?: boolean;
+    pkce?: boolean;
     /**
      * The code challenge methods the client is allowed to use.
      * it defaults to `['S256']`.

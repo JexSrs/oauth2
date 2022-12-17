@@ -7,8 +7,8 @@ import {Events} from "../../components/events";
 export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
     const options = Object.assign({}, opts);
 
-    if (options.usePKCE === undefined)
-        options.usePKCE = true;
+    if (options.pkce === undefined)
+        options.pkce = true;
 
     if (options.validCodeChallengeMethods === undefined)
         options.validCodeChallengeMethods = ['S256'];
@@ -40,7 +40,7 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                 let {redirect_uri, code_challenge, code_challenge_method} = data.req.query;
 
                 // Check for PKCE
-                if (options.usePKCE) {
+                if (options.pkce) {
                     if (!code_challenge) {
                         eventEmitter.emit(Events.INVALID_PKCE, data.req);
                         return {
@@ -129,7 +129,7 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                         error_uri: options.errorUri
                     };
 
-                if (options.usePKCE && !code_verifier)
+                if (options.pkce && !code_verifier)
                     return {
                         error: 'invalid_request',
                         error_description: 'Body parameter code_verifier is missing',
@@ -184,7 +184,7 @@ export function authorizationCode(opts: AuthorizationCodeOptions): Flow[] {
                 }
 
                 // Check PKCE
-                if (options.usePKCE) {
+                if (options.pkce) {
                     if ((await options.hashCodeChallenge!(code_verifier, dbCode.codeChallengeMethod!, data.req)) !== dbCode.codeChallenge) {
                         eventEmitter.emit(Events.INVALID_PKCE, data.req);
                         return {

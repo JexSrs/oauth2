@@ -159,7 +159,7 @@ Click [here](docs/authorizationServer/functions_and_endpoints.md) for more detai
 
 ### State
 If you have read all the documentation so far I am sure you have noticed how all options that provide
-a function (method) also pass an `Ecpress Request` instance of the current request. Using that object
+a function (method) also pass an `Express Request` instance of the current request. Using that object
 you can create a state between the called option functions (methods).
 
 For example:

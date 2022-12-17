@@ -28,7 +28,7 @@ endpoint where it verifies the authorization code and generates the tokens.
 
 ## Options
 
-### `usePKCE`
+### `pkce`
 PKCE (Proof Key for Code Exchange) is an extension to the authorization code flow
 that enhances protection. More specifically ts to prevents CSRF and authorization code injection attacks.
 It defaults to `true`.
@@ -117,3 +117,7 @@ It is extremely important to delete an authorization code after it is used
 to avoid being used by someone else.
 If the authorization code is used more than once, it is recommended to treat it as an attack (leaked code)
 and revoke all the generated tokens.
+
+## Break down
+
+[//]: # (TODO)

@@ -19,7 +19,7 @@ export type THTokenSave = {
     accessTokenExpiresAt?: number;
     refreshToken?: string;
     refreshTokenExpiresAt?: number;
-    clientId: string;
+    clientId: any;
     user?: any;
     scopes: string[];
 };
@@ -27,7 +27,7 @@ export type THTokenSave = {
 export type THAuthorizationCodeSave = {
     authorizationCode: string;
     expiresAt: number;
-    clientId: string;
+    clientId: any;
     user: any;
     codeChallenge?: string;
     codeChallengeMethod?: string;
@@ -35,24 +35,24 @@ export type THAuthorizationCodeSave = {
 
 export type THAuthorizationCodeAsk = {
     authorizationCode: string;
-    clientId: string;
+    clientId: any;
     user: any;
 };
 
 export type THAccessTokenAsk = {
     accessToken: string;
-    clientId: string;
+    clientId: any;
     user: any;
 };
 
 export type THRefreshTokenAsk = {
     refreshToken: string;
-    clientId: string;
+    clientId: any;
     user: any;
 };
 
 export type DFCodeSave = {
-    clientId: string;
+    clientId: any;
     deviceCode: string;
     userCode: string;
     interval: number;
@@ -62,17 +62,18 @@ export type DFCodeSave = {
 };
 
 export type DFCodeAsk = {
-    clientId: string;
+    clientId: any;
     deviceCode: string;
 };
 
 export type RevocationAsk = {
-    what: 'access_token' | 'refresh_token' | 'record';
-    clientId: string;
+    clientId: any;
     user?: any;
 } & ({
+    what: 'access_token'
     accessToken: string;
 } | {
+    what: 'refresh_token' | 'record';
     refreshToken: string;
 });
 
